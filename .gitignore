@@ -1,0 +1,42 @@
+# ── Dependencies ──────────────────────────────────────────────
+node_modules/
+
+# ── Build output ──────────────────────────────────────────────
+dist/
+builds/
+
+# ── Environment & secrets ─────────────────────────────────────
+.env
+.env.*
+
+# ── AI agent / skill tooling ──────────────────────────────────
+.agents/
+.gemini/
+.junie/
+.factory/
+.firecrawl/
+.vera/
+AGENTS.md
+skills-lock.json
+
+# ── Editor & OS junk ─────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Temp / scratch ────────────────────────────────────────────
+tmp/
+
+# ── Lockfiles (bun.lock is the canonical lock; ignore npm's) ─
+package-lock.json
+
+# ── Test / coverage ───────────────────────────────────────────
+coverage/
+
+# ── Logs ──────────────────────────────────────────────────────
+*.log
+npm-debug.log*

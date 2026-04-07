@@ -1,0 +1,79 @@
+[h1]ElderGPT Spirit Ring[/h1]
+[i]A read-only AI advisor overlay for Ascend From Nine Mountains.[/i]
+
+Want advice without tabbing out to a browser?
+ElderGPT Spirit Ring reads your live game state through the official modAPI, builds a compact context snapshot, and lets you chat with the AI model of your choice inside the game.
+
+[h2]Highlights[/h2]
+[list]
+[*][b]Read-only by design[/b] - it does not automate combat, spend resources, or make choices for you.
+[*][b]Always nearby[/b] - open it from the floating Spirit Ring button, or from the combat victory screen.
+[*][b]Live context[/b] - advice is grounded in your current run, not a generic wiki answer.
+[*][b]Persistent chat[/b] - minimize it and reopen later without losing the conversation.
+[*][b]Optional proactive hints[/b] - it can chime in after important moments like combat, travel, crafting, and time skips.
+[*][b]Bring your own model[/b] - works with hosted OpenAI-compatible providers or local OpenAI-compatible servers.
+[/list]
+
+[h2]What you can ask it[/h2]
+[quote]
+"What should I focus on next?"
+
+"How should I approach this fight?"
+
+"Is this a good time to travel?"
+
+"What am I missing in this crafting setup?"
+
+"Which stats or resources are holding me back?"
+[/quote]
+
+[h2]Quick start[/h2]
+[list]
+[*]Open the Spirit Ring from the floating circular button.
+[*]Open [b]Settings[/b].
+[*]Enter your API URL, API key, and model ID.
+[*]Pick a persona if you want.
+[*]Ask for advice normally in plain language.
+[/list]
+
+[h2]Recommended AI setup options[/h2]
+[b]1) Use your favorite hosted provider[/b]
+
+If you already have a provider you like, use that.
+[url=https://openrouter.ai/docs/quickstart]OpenRouter[/url] is an easy choice because it gives you access to a lot of models through one OpenAI-compatible endpoint.
+
+[code]https://openrouter.ai/api/v1[/code]
+
+[b]2) Good free hosted option: NVIDIA NIM[/b]
+
+[url=https://build.nvidia.com]NVIDIA NIM[/url] is a strong free option for testing and light use through the NVIDIA Developer Program.
+It exposes an OpenAI-compatible API, so it drops straight into the mod.
+
+[code]https://integrate.api.nvidia.com/v1[/code]
+
+If you want a fast, strong default there, try [url=https://docs.api.nvidia.com/nim/reference/moonshotai-kimi-k2-instruct-0905]moonshotai / kimi-k2-instruct-0905[/url].
+It is one of the faster good options on NIM right now and usually feels responsive for in-game advice.
+
+[b]3) Good free local option: run your own server[/b]
+
+If you want private or fully local inference, run an OpenAI-compatible server with [url=https://github.com/ggml-org/llama.cpp]llama.cpp[/url] or [url=https://github.com/LostRuins/koboldcpp]KoboldCpp[/url].
+
+Good small local model families to try:
+[list]
+[*][url=https://developers.googleblog.com/bring-state-of-the-art-agentic-skills-to-the-edge-with-gemma-4/]Gemma 4[/url] small variants
+[*]Qwen 3.5 small variants / GGUF builds
+[/list]
+
+If your local runner exposes an OpenAI-compatible [code]/v1[/code] endpoint, ElderGPT Spirit Ring can use it.
+
+[h2]Good to know[/h2]
+[list]
+[*]This mod does not include an API key or a bundled model.
+[*]Advice quality depends heavily on the model you choose.
+[*]Faster models usually feel better for moment-to-moment gameplay.
+[*]Proactive hints are optional and can be disabled in Settings.
+[/list]
+
+[h2]Feedback and bugs[/h2]
+If the advice feels wrong, confusing, or out of date, leave a comment with what was happening in-game and what the mod told you.
+That is the fastest way to improve it.
