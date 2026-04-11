@@ -1,5 +1,7 @@
 export type Persona = 'Elder' | 'Calculator' | 'Custom';
 export type ApiProvider = 'openai' | 'anthropic';
+export type FontSize = 'small' | 'medium' | 'large';
+export type PanelSize = 'compact' | 'default' | 'large';
 
 export interface ChatSettings {
   apiUrl: string;
@@ -10,6 +12,9 @@ export interface ChatSettings {
   proactiveEnabled: boolean;
   provider: ApiProvider;
   requestTimeoutSeconds: number;
+  fontSize: FontSize;
+  panelSize: PanelSize;
+  showStreaming: boolean;
 }
 
 export const SETTINGS_STORAGE_KEY = 'eldergpt_settings';
@@ -17,6 +22,14 @@ export const SETTINGS_STORAGE_KEY = 'eldergpt_settings';
 export const MIN_TIMEOUT_SECONDS = 10;
 export const MAX_TIMEOUT_SECONDS = 999;
 export const DEFAULT_TIMEOUT_SECONDS = 30;
+export const TIMEOUT_NOTCHES = [10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 999];
+
+export const FONT_SIZES: Record<FontSize, number> = { small: 12, medium: 14, large: 16 };
+export const PANEL_DIMENSIONS: Record<PanelSize, { width: number; height: number }> = {
+  compact: { width: 300, height: 400 },
+  default: { width: 350, height: 500 },
+  large: { width: 420, height: 600 },
+};
 
 export const DEFAULT_SETTINGS: ChatSettings = {
   apiUrl: 'http://localhost:1234/v1/chat/completions',
@@ -27,6 +40,9 @@ export const DEFAULT_SETTINGS: ChatSettings = {
   proactiveEnabled: false,
   provider: 'openai',
   requestTimeoutSeconds: DEFAULT_TIMEOUT_SECONDS,
+  fontSize: 'medium',
+  panelSize: 'default',
+  showStreaming: true,
 };
 
 const MOD_TAG = '[ElderGPT]';
@@ -51,6 +67,14 @@ function normalizeTimeout(value: unknown): number {
   return Math.max(MIN_TIMEOUT_SECONDS, Math.min(MAX_TIMEOUT_SECONDS, Math.round(value)));
 }
 
+function normalizeFontSize(value: unknown): FontSize {
+  return value === 'small' || value === 'large' ? value : 'medium';
+}
+
+function normalizePanelSize(value: unknown): PanelSize {
+  return value === 'compact' || value === 'large' ? value : 'default';
+}
+
 function normalizeSettings(value: unknown): ChatSettings {
   if (!isRecord(value)) {
     return DEFAULT_SETTINGS;
@@ -68,6 +92,9 @@ function normalizeSettings(value: unknown): ChatSettings {
         : DEFAULT_SETTINGS.proactiveEnabled,
     provider: normalizeProvider(value.provider),
     requestTimeoutSeconds: normalizeTimeout(value.requestTimeoutSeconds),
+    fontSize: normalizeFontSize(value.fontSize),
+    panelSize: normalizePanelSize(value.panelSize),
+    showStreaming: typeof value.showStreaming === 'boolean' ? value.showStreaming : DEFAULT_SETTINGS.showStreaming,
   };
 }
 
@@ -132,4 +159,34 @@ export function updateSettings(
   saveSettings(currentSettings);
   emit();
   return currentSettings;
+}
+
+export function nearestNotchIndex(value: number): number {
+  let closest = 0;
+  let minDiff = Math.abs(TIMEOUT_NOTCHES[0] - value);
+  for (let i = 1; i < TIMEOUT_NOTCHES.length; i++) {
+    const diff = Math.abs(TIMEOUT_NOTCHES[i] - value);
+    if (diff < minDiff) { minDiff = diff; closest = i; }
+  }
+  return closest;
+}
+
+const POSITION_STORAGE_KEY = 'eldergpt_panel_position';
+
+export function loadPanelPosition(): { x: number; y: number } | null {
+  if (!canUseLocalStorage()) return null;
+  try {
+    const stored = window.localStorage.getItem(POSITION_STORAGE_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    if (typeof parsed?.x !== 'number' || typeof parsed?.y !== 'number') return null;
+    return { x: parsed.x, y: parsed.y };
+  } catch { return null; }
+}
+
+export function savePanelPosition(pos: { x: number; y: number }) {
+  if (!canUseLocalStorage()) return;
+  try {
+    window.localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify({ x: pos.x, y: pos.y }));
+  } catch { /* ignored */ }
 }

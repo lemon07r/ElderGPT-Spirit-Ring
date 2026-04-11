@@ -1,6 +1,6 @@
 import React from 'react';
-import type { ApiProvider, ChatSettings, Persona } from '../../config/settings';
-import { MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS } from '../../config/settings';
+import type { ApiProvider, ChatSettings, FontSize, PanelSize, Persona } from '../../config/settings';
+import { FONT_SIZES, TIMEOUT_NOTCHES, nearestNotchIndex } from '../../config/settings';
 import { isTextEntryElement, pasteClipboardIntoElement } from '../inputShortcuts';
 
 interface SettingsPanelProps {
@@ -12,13 +12,6 @@ interface SettingsPanelProps {
 export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    if (name === 'requestTimeoutSeconds') {
-      const num = parseInt(value, 10);
-      if (!Number.isNaN(num)) {
-        setSettings({ requestTimeoutSeconds: Math.max(MIN_TIMEOUT_SECONDS, Math.min(MAX_TIMEOUT_SECONDS, num)) });
-      }
-      return;
-    }
     const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
     setSettings({ [name]: val } as Partial<ChatSettings>);
   };
@@ -128,29 +121,29 @@ export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelP
       </label>
 
       <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <span>Request Timeout ({MIN_TIMEOUT_SECONDS}–{MAX_TIMEOUT_SECONDS}s)</span>
+        <span>Request Timeout</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <input
-            name="requestTimeoutSeconds"
             type="range"
-            min={MIN_TIMEOUT_SECONDS}
-            max={MAX_TIMEOUT_SECONDS}
-            value={settings.requestTimeoutSeconds}
-            onChange={handleChange}
+            min={0}
+            max={TIMEOUT_NOTCHES.length - 1}
+            step={1}
+            list="eldergpt-timeout-notches"
+            value={nearestNotchIndex(settings.requestTimeoutSeconds)}
+            onChange={(e) => {
+              const idx = parseInt(e.target.value, 10);
+              setSettings({ requestTimeoutSeconds: TIMEOUT_NOTCHES[idx] });
+            }}
             style={{ flex: 1, accentColor: '#C5A059' }}
           />
-          <input
-            name="requestTimeoutSeconds"
-            type="number"
-            min={MIN_TIMEOUT_SECONDS}
-            max={MAX_TIMEOUT_SECONDS}
-            value={settings.requestTimeoutSeconds}
-            onChange={handleChange}
-            onKeyDownCapture={handleTextShortcut}
-            onKeyUpCapture={stopShortcutPropagation}
-            style={{ ...inputStyle, width: '60px', textAlign: 'center' }}
-          />
-          <span style={{ color: '#a69d8c', fontSize: '12px' }}>sec</span>
+          <datalist id="eldergpt-timeout-notches">
+            {TIMEOUT_NOTCHES.map((v, i) => (
+              <option key={v} value={i} />
+            ))}
+          </datalist>
+          <span style={{ color: '#C5A059', fontWeight: 'bold', fontSize: '14px', minWidth: '40px', textAlign: 'right' }}>
+            {settings.requestTimeoutSeconds}s
+          </span>
         </div>
       </label>
 
@@ -199,6 +192,65 @@ export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelP
         </label>
       )}
 
+      <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <span>Text Size</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }}>
+          {FONT_SIZE_OPTIONS.map((option) => {
+            const isSelected = settings.fontSize === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => setSettings({ fontSize: option.value })}
+                style={{
+                  ...providerButtonStyle,
+                  borderColor: isSelected ? '#C5A059' : 'rgba(197, 160, 89, 0.25)',
+                  backgroundColor: isSelected ? 'rgba(197, 160, 89, 0.18)' : 'rgba(0,0,0,0.3)',
+                  color: isSelected ? '#f3ddab' : '#ddd',
+                  fontSize: `${FONT_SIZES[option.value]}px`,
+                }}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </label>
+
+      <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <span>Window Size</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }}>
+          {PANEL_SIZE_OPTIONS.map((option) => {
+            const isSelected = settings.panelSize === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => setSettings({ panelSize: option.value })}
+                style={{
+                  ...providerButtonStyle,
+                  borderColor: isSelected ? '#C5A059' : 'rgba(197, 160, 89, 0.25)',
+                  backgroundColor: isSelected ? 'rgba(197, 160, 89, 0.18)' : 'rgba(0,0,0,0.3)',
+                  color: isSelected ? '#f3ddab' : '#ddd',
+                }}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </label>
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+        <input name="showStreaming" type="checkbox" checked={settings.showStreaming} onChange={handleChange} />
+        <span>Show live response</span>
+      </label>
+      <p style={{ margin: 0, color: '#a69d8c', fontSize: '12px', lineHeight: 1.4 }}>
+        See words as the AI responds. Disable for a polished reveal.
+      </p>
+
       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
         <input name="proactiveEnabled" type="checkbox" checked={settings.proactiveEnabled} onChange={handleChange} />
         <span>Enable proactive suggestions</span>
@@ -242,6 +294,18 @@ const PROVIDER_OPTIONS: Array<{
 }> = [
   { value: 'openai', label: 'OpenAI Compatible' },
   { value: 'anthropic', label: 'Anthropic' },
+];
+
+const FONT_SIZE_OPTIONS: Array<{ value: FontSize; label: string }> = [
+  { value: 'small', label: 'Small' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'large', label: 'Large' },
+];
+
+const PANEL_SIZE_OPTIONS: Array<{ value: PanelSize; label: string }> = [
+  { value: 'compact', label: 'Compact' },
+  { value: 'default', label: 'Default' },
+  { value: 'large', label: 'Large' },
 ];
 
 const providerButtonStyle = {

@@ -4,6 +4,7 @@ import { clampToViewport, Corner, getClosestCorner } from './dragUtils';
 export function useDraggable(
   setCorner: (corner: Corner) => void,
   dragRef: RefObject<HTMLDivElement | null>,
+  onDragEnd?: (pos: { x: number; y: number }) => void,
 ) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
@@ -100,13 +101,16 @@ export function useDraggable(
     }
     stopDragging();
 
-    // Snap only if actually moved
     if (moved) {
-      const rect = dragRef.current?.getBoundingClientRect();
-      const centerX = position.x + (rect?.width ?? 0) / 2;
-      const centerY = position.y + (rect?.height ?? 0) / 2;
-      const newCorner = getClosestCorner(centerX, centerY);
-      setCorner(newCorner);
+      if (onDragEnd) {
+        onDragEnd(position);
+      } else {
+        const rect = dragRef.current?.getBoundingClientRect();
+        const centerX = position.x + (rect?.width ?? 0) / 2;
+        const centerY = position.y + (rect?.height ?? 0) / 2;
+        const newCorner = getClosestCorner(centerX, centerY);
+        setCorner(newCorner);
+      }
     }
     hasMovedRef.current = false;
   };

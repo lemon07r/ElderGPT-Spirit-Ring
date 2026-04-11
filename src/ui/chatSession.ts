@@ -70,6 +70,39 @@ export function appendAssistantMessage(content: string) {
   }));
 }
 
+export function startStreamingMessage() {
+  updateState((previous) => ({
+    ...previous,
+    messages: [...previous.messages, { role: 'assistant' as const, content: '' }],
+  }));
+}
+
+export function appendStreamChunk(chunk: string) {
+  updateState((previous) => {
+    const messages = [...previous.messages];
+    const last = messages[messages.length - 1];
+    if (last?.role === 'assistant') {
+      messages[messages.length - 1] = { ...last, content: last.content + chunk };
+    }
+    return { ...previous, messages };
+  });
+}
+
+export function finalizeStreamingMessage(content: string) {
+  updateState((previous) => {
+    const messages = [...previous.messages];
+    const last = messages[messages.length - 1];
+    if (last?.role === 'assistant') {
+      messages[messages.length - 1] = { ...last, content: content.trim() || '...' };
+    }
+    return {
+      ...previous,
+      messages,
+      unreadCount: previous.isOpen ? previous.unreadCount : previous.unreadCount + 1,
+    };
+  });
+}
+
 export function setChatLoading(isLoading: boolean) {
   updateState((previous) => ({
     ...previous,

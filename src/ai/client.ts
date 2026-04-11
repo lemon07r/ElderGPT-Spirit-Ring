@@ -5,6 +5,8 @@ export interface Message {
   content: string;
 }
 
+export type StreamCallback = (chunk: string) => void;
+
 const DEFAULT_CHAT_URL = 'http://localhost:1234/v1/chat/completions';
 const DEFAULT_MODEL = 'kimi-k2.5';
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -170,7 +172,7 @@ export class AIClient {
     return headers;
   }
 
-  private buildBody(messages: Message[]): string {
+  private buildBody(messages: Message[], stream = false): string {
     if (this.provider === 'anthropic') {
       const systemMessages = messages.filter((m) => m.role === 'system');
       const nonSystemMessages = messages.filter((m) => m.role !== 'system');
@@ -186,18 +188,19 @@ export class AIClient {
         temperature: 0.7,
       };
 
-      if (systemText) {
-        body.system = systemText;
-      }
+      if (systemText) body.system = systemText;
+      if (stream) body.stream = true;
 
       return JSON.stringify(body);
     }
 
-    return JSON.stringify({
+    const body: Record<string, unknown> = {
       model: this.modelId,
       messages,
       temperature: 0.7,
-    });
+    };
+    if (stream) body.stream = true;
+    return JSON.stringify(body);
   }
 
   private extractContent(
@@ -282,6 +285,125 @@ export class AIClient {
         : msg || 'Unknown error';
       console.error('[ElderGPT] AI error', error);
       return this.formatError(message);
+    }
+  }
+
+  private extractStreamChunk(parsed: unknown): string {
+    if (!parsed || typeof parsed !== 'object') return '';
+    const obj = parsed as Record<string, unknown>;
+
+    if (this.provider === 'anthropic') {
+      if (obj.type === 'content_block_delta') {
+        const delta = obj.delta as Record<string, unknown> | undefined;
+        if (delta?.type === 'text_delta') return (delta.text as string) || '';
+      }
+      return '';
+    }
+
+    const choices = obj.choices as Array<Record<string, unknown>> | undefined;
+    const delta = choices?.[0]?.delta as Record<string, unknown> | undefined;
+    return (delta?.content as string) || '';
+  }
+
+  private async fetchChatStream(messages: Message[], onChunk: StreamCallback): Promise<string> {
+    const controller =
+      typeof AbortController === 'function' ? new AbortController() : null;
+    const timeoutId = controller
+      ? globalThis.setTimeout(() => controller.abort(), this.timeoutMs)
+      : null;
+
+    try {
+      const response = await fetch(this.url, {
+        method: 'POST',
+        headers: this.buildHeaders(),
+        signal: controller?.signal,
+        body: this.buildBody(messages, true),
+      });
+
+      if (!response.ok) {
+        if (this.provider === 'anthropic') {
+          const data = await parseResponseJson<AnthropicChatResponse>(response);
+          throw new Error(this.extractErrorMessage('anthropic', response, null, data));
+        }
+        const data = await parseResponseJson<OpenAIChatResponse>(response);
+        throw new Error(this.extractErrorMessage('openai', response, data, null));
+      }
+
+      if (!response.body) {
+        if (this.provider === 'anthropic') {
+          const data = await parseResponseJson<AnthropicChatResponse>(response);
+          const content = this.extractContent('anthropic', null, data) || '...';
+          onChunk(content);
+          return content;
+        }
+        const data = await parseResponseJson<OpenAIChatResponse>(response);
+        const content = this.extractContent('openai', data, null) || '...';
+        onChunk(content);
+        return content;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          const data = trimmed.slice(6);
+          if (data === '[DONE]') continue;
+
+          let parsed: unknown;
+          try { parsed = JSON.parse(data); } catch { continue; }
+
+          const chunk = this.extractStreamChunk(parsed);
+          if (chunk) {
+            fullContent += chunk;
+            onChunk(chunk);
+          }
+        }
+      }
+
+      return fullContent || '...';
+    } finally {
+      if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
+    }
+  }
+
+  async chatStream(messages: Message[], onChunk: StreamCallback): Promise<string> {
+    let accumulated = '';
+    const tracking: StreamCallback = (chunk) => {
+      accumulated += chunk;
+      onChunk(chunk);
+    };
+    try {
+      return await this.fetchChatStream(messages, tracking);
+    } catch (error) {
+      const isErrorLike = error instanceof Error ||
+        (typeof error === 'object' && error !== null && 'message' in error);
+      const msg = isErrorLike ? String((error as { message: string }).message) : '';
+      const name = isErrorLike && 'name' in (error as object) ? String((error as { name: string }).name) : '';
+      const timedOut = name === 'AbortError' || msg.includes('aborted') || msg.includes('abort');
+      const timeoutSec = Math.trunc(this.timeoutMs / 1000);
+      const message = timedOut
+        ? `Request timed out after ${timeoutSec} seconds`
+        : msg || 'Unknown error';
+      console.error('[ElderGPT] AI streaming error', error);
+      const errorText = this.formatError(message);
+      if (accumulated) {
+        const suffix = '\n\n' + errorText;
+        onChunk(suffix);
+        return accumulated + suffix;
+      }
+      onChunk(errorText);
+      return errorText;
     }
   }
 

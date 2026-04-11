@@ -1,6 +1,14 @@
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { AIClient, Message } from '../../ai/client';
-import { readSettingsSnapshot, subscribeToSettings, updateSettings } from '../../config/settings';
+import {
+  FONT_SIZES,
+  PANEL_DIMENSIONS,
+  loadPanelPosition,
+  savePanelPosition,
+  readSettingsSnapshot,
+  subscribeToSettings,
+  updateSettings,
+} from '../../config/settings';
 import { extractContext, getSystemPrompt } from '../../integration/contextEngine';
 import { readGameStateSnapshot, subscribeToGameState } from '../../integration/gameState';
 import {
@@ -8,22 +16,49 @@ import {
   appendUserMessage,
   readChatSessionSnapshot,
   setChatLoading,
+  startStreamingMessage,
+  appendStreamChunk,
+  finalizeStreamingMessage,
   subscribeToChatSession,
 } from '../chatSession';
 import { useDraggable } from '../../utils/useDraggable';
+import { getClosestCorner, Corner } from '../../utils/dragUtils';
 import { isTextEntryElement, pasteClipboardIntoElement } from '../inputShortcuts';
 import { SettingsPanel } from './SettingsPanel';
+import { MarkdownText } from './MarkdownText';
+import { LoadingAnimation } from './LoadingAnimation';
 
 interface Props {
-  corner: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
-  setCorner: (corner: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left') => void;
+  corner: Corner;
+  setCorner: (corner: Corner) => void;
   onClose: () => void;
+}
+
+const PANEL_MARGIN = 20;
+
+function cornerToPosition(c: Corner, width: number, height: number): { x: number; y: number } {
+  switch (c) {
+    case 'top-right': return { x: window.innerWidth - width - PANEL_MARGIN, y: PANEL_MARGIN };
+    case 'top-left': return { x: PANEL_MARGIN, y: PANEL_MARGIN };
+    case 'bottom-right': return { x: window.innerWidth - width - PANEL_MARGIN, y: window.innerHeight - height - PANEL_MARGIN };
+    case 'bottom-left': return { x: PANEL_MARGIN, y: window.innerHeight - height - PANEL_MARGIN };
+  }
 }
 
 export function ChatPanel({ corner, setCorner, onClose }: Props) {
   const dragRef = useRef<HTMLDivElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
-  const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, dragPos, isDragging } = useDraggable(setCorner, dragRef);
+  const [savedPosition, setSavedPosition] = useState<{ x: number; y: number } | null>(() => loadPanelPosition());
+
+  const handleDragEnd = (pos: { x: number; y: number }) => {
+    setSavedPosition(pos);
+    savePanelPosition(pos);
+    const s = readSettingsSnapshot();
+    const d = PANEL_DIMENSIONS[s.panelSize];
+    setCorner(getClosestCorner(pos.x + d.width / 2, pos.y + d.height / 2));
+  };
+
+  const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, dragPos, isDragging } = useDraggable(setCorner, dragRef, handleDragEnd);
 
   const [showSettings, setShowSettings] = useState(false);
   const [input, setInput] = useState('');
@@ -40,19 +75,17 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
   );
   const context = extractContext(snapshot);
   const { messages, isLoading } = chatState;
+  const dim = PANEL_DIMENSIONS[settings.panelSize];
+  const fontSize = FONT_SIZES[settings.fontSize];
 
-  const getPositionStyles = () => {
-    if (dragPos) return { top: dragPos.y, left: dragPos.x, right: 'auto', bottom: 'auto' };
-    switch (corner) {
-      case 'top-right':
-        return { top: '20px', right: '20px' };
-      case 'top-left':
-        return { top: '20px', left: '20px' };
-      case 'bottom-right':
-        return { bottom: '20px', right: '20px' };
-      case 'bottom-left':
-        return { bottom: '20px', left: '20px' };
-    }
+  const getPositionStyles = (): React.CSSProperties => {
+    if (dragPos) return { top: dragPos.y, left: dragPos.x };
+    if (savedPosition) return {
+      top: Math.max(0, Math.min(savedPosition.y, window.innerHeight - 50)),
+      left: Math.max(0, Math.min(savedPosition.x, window.innerWidth - 100)),
+    };
+    const pos = cornerToPosition(corner, dim.width, dim.height);
+    return { top: pos.y, left: pos.x };
   };
 
   useEffect(() => {
@@ -60,19 +93,13 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
       top: messageListRef.current.scrollHeight,
       behavior: 'smooth',
     });
-  }, [messages.length, isLoading]);
+  }, [messages, isLoading]);
 
   useEffect(() => {
     const handleTextShortcut = (event: KeyboardEvent) => {
-      if ((!event.ctrlKey && !event.metaKey) || event.altKey) {
-        return;
-      }
-
+      if ((!event.ctrlKey && !event.metaKey) || event.altKey) return;
       const activeElement = document.activeElement;
-      if (!dragRef.current?.contains(activeElement) || !isTextEntryElement(activeElement)) {
-        return;
-      }
-
+      if (!dragRef.current?.contains(activeElement) || !isTextEntryElement(activeElement)) return;
       event.stopPropagation();
       if (event.key.toLowerCase() === 'v') {
         event.preventDefault();
@@ -86,9 +113,7 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
 
   const handleSend = async () => {
     const trimmedInput = input.trim();
-    if (!trimmedInput || isLoading) {
-      return;
-    }
+    if (!trimmedInput || isLoading) return;
 
     const userMessage: Message = { role: 'user', content: trimmedInput };
     const history = [...readChatSessionSnapshot().messages, userMessage];
@@ -106,8 +131,20 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
     });
 
     try {
-      const response = await client.chat([{ role: 'system', content: systemContent }, ...history]);
-      appendAssistantMessage(response);
+      if (settings.showStreaming) {
+        startStreamingMessage();
+        const response = await client.chatStream(
+          [{ role: 'system', content: systemContent }, ...history],
+          (chunk) => appendStreamChunk(chunk),
+        );
+        finalizeStreamingMessage(response);
+      } else {
+        const response = await client.chatStream(
+          [{ role: 'system', content: systemContent }, ...history],
+          () => {},
+        );
+        appendAssistantMessage(response);
+      }
     } finally {
       setChatLoading(false);
     }
@@ -129,6 +166,12 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
     }
   };
 
+  const isStreamingWithContent = settings.showStreaming && isLoading &&
+    messages.length > 0 &&
+    messages[messages.length - 1].role === 'assistant' &&
+    messages[messages.length - 1].content.length > 0;
+  const showLoading = isLoading && !isStreamingWithContent;
+
   return (
     <div
       ref={dragRef}
@@ -136,6 +179,9 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
       aria-label="Spirit Ring Chat"
       onKeyDown={stopEventPropagation}
       onKeyUp={stopEventPropagation}
+      onMouseDown={stopEventPropagation}
+      onMouseUp={stopEventPropagation}
+      onClick={stopEventPropagation}
       onCopy={stopEventPropagation}
       onCut={stopEventPropagation}
       onPaste={stopEventPropagation}
@@ -144,8 +190,8 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
         pointerEvents: 'auto',
         position: 'absolute',
         ...getPositionStyles(),
-        width: '350px',
-        height: '500px',
+        width: `${dim.width}px`,
+        height: `${dim.height}px`,
         backgroundColor: 'rgba(15, 15, 20, 0.95)',
         border: '1px solid #C5A059',
         borderRadius: '8px',
@@ -154,6 +200,7 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
         flexDirection: 'column',
         color: '#ddd',
         fontFamily: 'sans-serif',
+        fontSize: `${fontSize}px`,
         overflow: 'hidden',
         cursor: isDragging ? 'grabbing' : 'default',
       }}
@@ -216,37 +263,46 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
               gap: '10px',
             }}
           >
-            {messages.map((msg, i) => (
-              <div
-                key={i}
-                style={{
-                  alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                  backgroundColor:
-                    msg.role === 'user' ? 'rgba(197, 160, 89, 0.2)' : 'rgba(0,0,0,0.3)',
-                  border: `1px solid ${
-                    msg.role === 'user' ? '#C5A059' : 'rgba(197, 160, 89, 0.3)'
-                  }`,
-                  padding: '8px',
-                  borderRadius: '8px',
-                  maxWidth: '85%',
-                }}
-              >
-                <span
+            {messages.map((msg, i) => {
+              if (msg.role === 'assistant' && msg.content === '') return null;
+              return (
+                <div
+                  key={i}
                   style={{
-                    color: msg.role === 'user' ? '#ddd' : '#C5A059',
-                    fontWeight: 'bold',
-                    display: 'block',
-                    marginBottom: '4px',
+                    alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                    backgroundColor:
+                      msg.role === 'user' ? 'rgba(197, 160, 89, 0.2)' : 'rgba(0,0,0,0.3)',
+                    border: `1px solid ${
+                      msg.role === 'user' ? '#C5A059' : 'rgba(197, 160, 89, 0.3)'
+                    }`,
+                    padding: '8px',
+                    borderRadius: '8px',
+                    maxWidth: '85%',
                   }}
                 >
-                  {msg.role === 'user'
-                    ? 'You:'
-                    : `${settings.persona === 'Calculator' ? 'Calculator' : 'Elder'}:`}
-                </span>
-                <p style={{ margin: 0, opacity: 0.9, whiteSpace: 'pre-wrap' }}>{msg.content}</p>
-              </div>
-            ))}
-            {isLoading && <div style={{ color: '#aaa', fontStyle: 'italic' }}>Contemplating the Dao...</div>}
+                  <span
+                    style={{
+                      color: msg.role === 'user' ? '#ddd' : '#C5A059',
+                      fontWeight: 'bold',
+                      display: 'block',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {msg.role === 'user'
+                      ? 'You:'
+                      : `${settings.persona === 'Calculator' ? 'Calculator' : 'Elder'}:`}
+                  </span>
+                  {msg.role === 'assistant' ? (
+                    <div style={{ opacity: 0.9 }}>
+                      <MarkdownText text={msg.content} fontSize={fontSize} />
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, opacity: 0.9, whiteSpace: 'pre-wrap' }}>{msg.content}</p>
+                  )}
+                </div>
+              );
+            })}
+            {showLoading && <LoadingAnimation />}
           </div>
 
           <div
@@ -276,6 +332,7 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
                 padding: '8px',
                 borderRadius: '4px',
                 outline: 'none',
+                fontSize: `${fontSize}px`,
               }}
             />
             <button
@@ -291,6 +348,7 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
                 padding: '8px 12px',
                 borderRadius: '4px',
                 cursor: isLoading || !input.trim() ? 'default' : 'pointer',
+                fontSize: `${fontSize}px`,
               }}
             >
               Send

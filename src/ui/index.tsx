@@ -38,7 +38,7 @@ export function initUI() {
   rootDiv.style.width = '100vw';
   rootDiv.style.height = '100vh';
   rootDiv.style.pointerEvents = 'none';
-  rootDiv.style.zIndex = '9999';
+  rootDiv.style.zIndex = '2147483647';
 
   document.body.appendChild(rootDiv);
 
