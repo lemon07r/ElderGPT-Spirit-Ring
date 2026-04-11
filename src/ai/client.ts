@@ -104,8 +104,27 @@ export class AIClient {
     this.modelId = modelId?.trim() || DEFAULT_MODEL;
   }
 
-  async chat(messages: Message[]): Promise<string> {
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  private buildHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (this.apiKey) {
+      headers['Authorization'] = `Bearer ${this.apiKey}`;
+    }
+    return headers;
+  }
+
+  private buildBody(messages: Message[]): string {
+    return JSON.stringify({
+      model: this.modelId,
+      messages,
+      temperature: 0.7,
+    });
+  }
+
+  private async fetchChat(messages: Message[]): Promise<string> {
+    const controller =
+      typeof AbortController === 'function' ? new AbortController() : null;
     const timeoutId = controller
       ? globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
       : null;
@@ -113,16 +132,9 @@ export class AIClient {
     try {
       const response = await fetch(this.url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
-        },
+        headers: this.buildHeaders(),
         signal: controller?.signal,
-        body: JSON.stringify({
-          model: this.modelId,
-          messages,
-          temperature: 0.7,
-        }),
+        body: this.buildBody(messages),
       });
 
       const data = await parseResponseJson(response);
@@ -133,20 +145,30 @@ export class AIClient {
 
       const content = readContentText(data?.choices?.[0]?.message?.content);
       return content || '...';
-    } catch (error) {
-      const timedOut = controller?.signal.aborted ?? false;
-      const message = timedOut
-        ? `Request timed out after ${Math.trunc(REQUEST_TIMEOUT_MS / 1000)} seconds`
-        : error instanceof Error
-          ? error.message
-          : 'Unknown error';
-
-      console.error('[ElderGPT] AI error', error);
-      return `[System: The heavenly connection is severed - ${message}]`;
     } finally {
       if (timeoutId !== null) {
         globalThis.clearTimeout(timeoutId);
       }
     }
+  }
+
+  // As of AFNM 0.6.50 the game no longer sets a restrictive connect-src CSP,
+  // so fetch works directly for external endpoints.  No XHR fallback needed.
+  async chat(messages: Message[]): Promise<string> {
+    try {
+      return await this.fetchChat(messages);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : '';
+      const timedOut = msg.includes('aborted') || msg.includes('abort');
+      const message = timedOut
+        ? `Request timed out after ${Math.trunc(REQUEST_TIMEOUT_MS / 1000)} seconds`
+        : msg || 'Unknown error';
+      console.error('[ElderGPT] AI error', error);
+      return this.formatError(message);
+    }
+  }
+
+  private formatError(message: string): string {
+    return `[System: The heavenly connection is severed - ${message}]`;
   }
 }

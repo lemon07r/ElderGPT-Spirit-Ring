@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ChatSettings, Persona } from '../../config/settings';
+import { isTextEntryElement, pasteClipboardIntoElement } from '../inputShortcuts';
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -12,6 +13,25 @@ export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelP
     const { name, value, type } = e.target;
     const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
     setSettings({ [name]: val } as Partial<ChatSettings>);
+  };
+  const handleTextShortcut = (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (!event.ctrlKey && !event.metaKey) {
+      return;
+    }
+
+    event.stopPropagation();
+
+    if (event.altKey || event.key.toLowerCase() !== 'v' || !isTextEntryElement(event.currentTarget)) {
+      return;
+    }
+
+    event.preventDefault();
+    void pasteClipboardIntoElement(event.currentTarget);
+  };
+  const stopShortcutPropagation = (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (event.ctrlKey || event.metaKey) {
+      event.stopPropagation();
+    }
   };
 
   const setPersona = (persona: Persona) => {
@@ -29,6 +49,11 @@ export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelP
           type="text"
           value={settings.apiUrl}
           onChange={handleChange}
+          onKeyDownCapture={handleTextShortcut}
+          onKeyUpCapture={stopShortcutPropagation}
+          onPasteCapture={(event) => event.stopPropagation()}
+          onCopyCapture={(event) => event.stopPropagation()}
+          onCutCapture={(event) => event.stopPropagation()}
           style={inputStyle}
           placeholder="Base URL or full /v1/chat/completions endpoint"
         />
@@ -36,12 +61,35 @@ export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelP
 
       <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         <span>API Key</span>
-        <input name="apiKey" type="password" value={settings.apiKey} onChange={handleChange} style={inputStyle} />
+        <input
+          name="apiKey"
+          type="password"
+          value={settings.apiKey}
+          onChange={handleChange}
+          onKeyDownCapture={handleTextShortcut}
+          onKeyUpCapture={stopShortcutPropagation}
+          onPasteCapture={(event) => event.stopPropagation()}
+          onCopyCapture={(event) => event.stopPropagation()}
+          onCutCapture={(event) => event.stopPropagation()}
+          style={inputStyle}
+        />
       </label>
 
       <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         <span>Model ID</span>
-        <input name="modelId" type="text" value={settings.modelId} onChange={handleChange} style={inputStyle} placeholder="e.g., kimi-k2.5" />
+        <input
+          name="modelId"
+          type="text"
+          value={settings.modelId}
+          onChange={handleChange}
+          onKeyDownCapture={handleTextShortcut}
+          onKeyUpCapture={stopShortcutPropagation}
+          onPasteCapture={(event) => event.stopPropagation()}
+          onCopyCapture={(event) => event.stopPropagation()}
+          onCutCapture={(event) => event.stopPropagation()}
+          style={inputStyle}
+          placeholder="e.g., kimi-k2.5"
+        />
       </label>
 
       <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -79,6 +127,11 @@ export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelP
             name="customPrompt"
             value={settings.customPrompt}
             onChange={handleChange}
+            onKeyDownCapture={handleTextShortcut}
+            onKeyUpCapture={stopShortcutPropagation}
+            onPasteCapture={(event) => event.stopPropagation()}
+            onCopyCapture={(event) => event.stopPropagation()}
+            onCutCapture={(event) => event.stopPropagation()}
             style={{ ...inputStyle, height: '80px' }}
           />
         </label>

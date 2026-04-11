@@ -1,5 +1,9 @@
 import type { RootState } from 'afnm-types';
 
+// As of AFNM 0.6.50, modAPI.getGameStateSnapshot() and modAPI.subscribe()
+// are fully reliable across save-file loads and switches.  The modAPI path
+// is the default; window.gameStore is kept only as a last-resort fallback.
+
 const MOD_TAG = '[ElderGPT]';
 
 export type GameStateSource = 'modapi-snapshot' | 'redux-store' | 'unavailable';
@@ -29,6 +33,7 @@ export function readGameStateSnapshot(): RootState | null {
     return null;
   }
 
+  // modAPI is the reliable default since 0.6.50.
   try {
     if (typeof window.modAPI?.getGameStateSnapshot === 'function') {
       return window.modAPI.getGameStateSnapshot();
@@ -37,6 +42,7 @@ export function readGameStateSnapshot(): RootState | null {
     warn('modAPI.getGameStateSnapshot failed', error);
   }
 
+  // Legacy fallback – raw Redux store (read-only).
   try {
     return window.gameStore?.getState() ?? null;
   } catch (error) {
@@ -50,6 +56,7 @@ export function subscribeToGameState(listener: () => void): () => void {
     return () => {};
   }
 
+  // modAPI.subscribe is the reliable default since 0.6.50.
   try {
     if (typeof window.modAPI?.subscribe === 'function') {
       return window.modAPI.subscribe(listener);
@@ -58,6 +65,7 @@ export function subscribeToGameState(listener: () => void): () => void {
     warn('modAPI.subscribe failed', error);
   }
 
+  // Legacy fallback.
   try {
     return window.gameStore?.subscribe(listener) ?? (() => {});
   } catch (error) {

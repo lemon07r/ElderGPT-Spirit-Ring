@@ -11,6 +11,7 @@ import {
   subscribeToChatSession,
 } from '../chatSession';
 import { useDraggable } from '../../utils/useDraggable';
+import { isTextEntryElement, pasteClipboardIntoElement } from '../inputShortcuts';
 import { SettingsPanel } from './SettingsPanel';
 
 interface Props {
@@ -61,6 +62,28 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
     });
   }, [messages.length, isLoading]);
 
+  useEffect(() => {
+    const handleTextShortcut = (event: KeyboardEvent) => {
+      if ((!event.ctrlKey && !event.metaKey) || event.altKey) {
+        return;
+      }
+
+      const activeElement = document.activeElement;
+      if (!dragRef.current?.contains(activeElement) || !isTextEntryElement(activeElement)) {
+        return;
+      }
+
+      event.stopPropagation();
+      if (event.key.toLowerCase() === 'v') {
+        event.preventDefault();
+        void pasteClipboardIntoElement(activeElement);
+      }
+    };
+
+    window.addEventListener('keydown', handleTextShortcut, true);
+    return () => window.removeEventListener('keydown', handleTextShortcut, true);
+  }, []);
+
   const handleSend = async () => {
     const trimmedInput = input.trim();
     if (!trimmedInput || isLoading) {
@@ -93,6 +116,11 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
         : 'No live state';
   const stopEventPropagation = (event: React.SyntheticEvent) => {
     event.stopPropagation();
+  };
+  const stopShortcutPropagation = (event: React.KeyboardEvent) => {
+    if (event.ctrlKey || event.metaKey) {
+      event.stopPropagation();
+    }
   };
 
   return (
@@ -229,6 +257,11 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => event.key === 'Enter' && handleSend()}
+              onKeyDownCapture={stopShortcutPropagation}
+              onKeyUpCapture={stopShortcutPropagation}
+              onPasteCapture={stopEventPropagation}
+              onCopyCapture={stopEventPropagation}
+              onCutCapture={stopEventPropagation}
               style={{
                 flex: 1,
                 backgroundColor: 'rgba(0,0,0,0.5)',

@@ -58,12 +58,17 @@ bun run workshop:preview
 
 Source artwork lives at `docs/assets/workshop-preview.svg` and the uploader uses `docs/assets/workshop-preview.png` by default when that file exists.
 
-The Workshop title and user-facing description should be maintained in repo as well:
+The Workshop title and user-facing description should still be maintained in repo as reference copy:
 
 - title default: `ElderGPT Spirit Ring`
 - description source: `docs/assets/workshop-description.bbcode`
 
 Keep the Workshop description player-facing. It should explain value, features, setup, and usage clearly without leaking internal dev workflow or maintenance notes.
+
+Important:
+
+- normal update uploads should preserve the live Workshop title/description by default
+- only pass `--title`, `--description`, or `--sync-workshop-page` when you intentionally want to overwrite the live Workshop page copy
 
 ## 5. Upload To Workshop
 
@@ -71,12 +76,19 @@ Keep the Workshop description player-facing. It should explain value, features, 
 bun run workshop:upload -- --change-note "vX.Y.Z - release notes"
 ```
 
-The wrapper now uploads with `--visibility public` by default unless explicitly overridden.
+The wrapper uploads with `--visibility public` by default unless explicitly overridden.
+It also preserves the current live Workshop title/description unless you explicitly override them.
 
 First publish flow when no workshop item exists yet:
 
 ```bash
 bun run workshop:upload -- --allow-create --title "ElderGPT Spirit Ring" --change-note "vX.Y.Z - initial public release"
+```
+
+If you intentionally want to sync the committed repo title/description back to the Workshop page on an existing item:
+
+```bash
+bun run workshop:upload -- --sync-workshop-page --change-note "vX.Y.Z - refresh Workshop page copy"
 ```
 
 After first publish, write the returned workshop item ID back into `scripts/workshop-upload.ts` so normal update releases can use the default wrapper path.

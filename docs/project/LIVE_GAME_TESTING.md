@@ -4,7 +4,7 @@ status: active
 authoritative: true
 owner: eldergpt-maintainers
 last_verified: 2026-04-06
-source_of_truth: scripts/installed-game-runtime.js + installed AFNM 0.6.49 runtime
+source_of_truth: scripts/installed-game-runtime.js + installed AFNM 0.6.50 runtime
 review_cycle_days: 21
 related_files: scripts/installed-game-runtime.js,package.json,scripts/ui/agent-browser-harness.tsx,docs/project/RELEASE_PROCESS.md
 ---
@@ -58,6 +58,7 @@ The installed runtime currently reports:
 - `hasNativeLauncher: true`
 - `hasHostLauncher: true`
 - `disableSteamSentinelPath: /home/lamim/.local/share/Steam/steamapps/common/Ascend From Nine Mountains/disable_steam`
+  - **CRITICAL:** When finished testing, delete the `disable_steam` file so the game can communicate with Steam again. If left behind, workshop mods will not load.
 
 Recommended manual flow on Linux:
 
@@ -76,7 +77,7 @@ Why:
 Verified on April 6, 2026:
 
 - direct launch through `launch-native.sh --remote-debugging-port=9222` worked without Steam relaunch
-- the installed game re-extracted the new ElderGPT zip and logged mod metadata with `gameVersion: "0.6.49"`
+- the installed game re-extracted the new ElderGPT zip and logged mod metadata with `gameVersion: "0.6.50"`
 - `agent-browser` smoke checks confirmed the floating toggle rendered, the panel opened, minimizing and reopening preserved chat state, and `error.log` stayed empty
 
 ## When To Use Each Path

@@ -4,7 +4,7 @@ status: active
 authoritative: false
 owner: eldergpt-maintainers
 last_verified: 2026-04-04
-source_of_truth: live AFNM 0.6.49 runtime + official AFNM docs site + AfnmExampleMod repo
+source_of_truth: live AFNM 0.6.50 runtime + official AFNM docs site + AfnmExampleMod repo
 review_cycle_days: 45
 related_files: scripts/installed-game-runtime.js,docs/project/MODAPI_0_6_49_AUDIT.md,AGENTS.md
 ---
@@ -23,7 +23,7 @@ When AFNM changes, prefer those sources before reviving old reverse-engineering 
 
 ## Current Fallback Ladder
 
-As of AFNM `0.6.49`, use this order:
+As of AFNM `0.6.50`, use this order:
 
 1. `window.modAPI.getGameStateSnapshot()`
 2. `window.modAPI.subscribe()`

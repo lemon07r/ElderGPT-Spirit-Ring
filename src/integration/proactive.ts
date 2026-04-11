@@ -1,4 +1,4 @@
-import type { CraftingResult, EnemyEntity, Item } from 'afnm-types';
+import type { CombatEntity, CraftingResult, EnemyEntity, Item } from 'afnm-types';
 import { AIClient } from '../ai/client';
 import { readSettingsSnapshot } from '../config/settings';
 import { appendAssistantMessage } from '../ui/chatSession';
@@ -27,6 +27,14 @@ type ProactiveTrigger =
   | {
       kind: 'complete-crafting';
       itemName: string;
+    }
+  | {
+      kind: 'loot-drop';
+      itemNames: string[];
+    }
+  | {
+      kind: 'before-combat';
+      enemyNames: string[];
     };
 
 const MOD_TAG = '[ElderGPT]';
@@ -60,6 +68,14 @@ function describeTrigger(trigger: ProactiveTrigger): string {
     }
     case 'complete-crafting':
       return `The player just finished crafting ${trigger.itemName}. Offer one concise follow-up suggestion about use, next steps, or progression.`;
+    case 'loot-drop': {
+      const items = trigger.itemNames.join(', ');
+      return `The player just received loot: ${items}. Briefly explain what the most notable item does or how it could be useful.`;
+    }
+    case 'before-combat': {
+      const foes = trigger.enemyNames.join(', ');
+      return `The player is about to fight ${foes}. Offer one concise piece of tactical advice (weaknesses, recommended stances, or items to use).`;
+    }
   }
 }
 
@@ -197,5 +213,27 @@ export function registerProactiveHooks() {
     }
 
     return [];
+  });
+
+  // 0.6.50 hooks -------------------------------------------------------
+
+  window.modAPI.hooks.onLootDrop((items) => {
+    const names = items.map((i) => i.name).filter(Boolean).slice(0, 5);
+    if (names.length > 0) {
+      enqueue({
+        kind: 'loot-drop',
+        itemNames: names,
+      });
+    }
+  });
+
+  window.modAPI.hooks.onBeforeCombat((enemies, playerState, _flags) => {
+    enqueue({
+      kind: 'before-combat',
+      enemyNames: getEnemyNames(enemies),
+    });
+
+    // Read-only advisor: return inputs unchanged.
+    return { enemies, playerState };
   });
 }

@@ -49,7 +49,10 @@ The current normalized payload includes:
   Enemy names/count, player HP, max HP, and spar state.
 
 - `crafting`
-  Recipe name, progress numbers, condition, harmony, step number, consumed pills, and recommended technique types.
+  Recipe name, progress numbers, condition, harmony, step number, consumed pills, recommended technique types, and companion name (from `craftingTeamUpOverride`).
+
+- `recentEvents`
+  The most recent 5 entries from `persistentEventLog`, each with year/month/day and text history for richer AI context.
 
 ## Design Constraints
 

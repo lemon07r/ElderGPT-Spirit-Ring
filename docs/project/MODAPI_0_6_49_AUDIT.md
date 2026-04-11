@@ -1,15 +1,15 @@
 ---
-title: ModAPI 0.6.49 Audit
+title: ModAPI 0.6.49–0.6.50 Audit
 status: active
 authoritative: true
 owner: eldergpt-maintainers
 last_verified: 2026-04-06
-source_of_truth: live AFNM 0.6.49 runtime + afnm-types 0.6.49 + official upstream docs
+source_of_truth: live AFNM 0.6.50 runtime + afnm-types 0.6.50 + official upstream docs
 review_cycle_days: 21
 related_files: package.json,scripts/installed-game-runtime.js,src/integration/gameState.ts,src/integration/proactive.ts,src/integration/uiBridge.tsx,docs/reference/AFNM_MODDING.md
 ---
 
-# ModAPI 0.6.49 Audit
+# ModAPI 0.6.49–0.6.50 Audit
 
 This document records what changed upstream and how ElderGPT should respond.
 
@@ -40,7 +40,7 @@ From `0.6.47` to `0.6.49`, the type package now includes:
 - root-level `subscribe(listener)`
 - root-level `getGameStateSnapshot()`
 - the new hook signatures listed above
-- `GAME_VERSION = "0.6.49"`
+- `GAME_VERSION = "0.6.50"`
 - extra recipe completion fields in `reduxState.d.ts`
 - updated UI component props in `components.d.ts`
 - additional stat/item/event surface changes that are not currently critical to ElderGPT
@@ -49,12 +49,14 @@ From `0.6.47` to `0.6.49`, the type package now includes:
 
 These are implemented in the repo today:
 
-1. `afnm-types` upgraded to `0.6.49`
+1. `afnm-types` upgraded to `0.6.50`
 2. context reads now prefer `getGameStateSnapshot()`
 3. reactive UI state now prefers `subscribe()`
 4. a `combat-victory` entry point now uses `injectUI()`
-5. proactive suggestions now use `onLocationEnter`, `onAdvanceMonth`, long-skip `onAdvanceDay`, `onCompleteCombat`, and `onCompleteCrafting`
+5. proactive suggestions now use `onLocationEnter`, `onAdvanceMonth`, long-skip `onAdvanceDay`, `onCompleteCombat`, `onCompleteCrafting`, `onLootDrop`, and `onBeforeCombat` (read-only)
 6. the runtime oracle documents and verifies the new live API surface
+7. context extraction now includes `persistentEventLog` entries and `craftingTeamUpOverride` companion name
+8. CSP workaround removed — AFNM 0.6.50 no longer sets a restrictive `connect-src` CSP, so `fetch()` works directly
 
 ## Replace Immediately
 
@@ -86,5 +88,7 @@ These old patterns should now be considered second-class:
 - `onReduxAction`
   Powerful but reducer-time. Use only when a concrete gap cannot be solved with snapshots and subscriptions.
 
-- `onBeforeCombat`, `onCalculateDamage`, `onEventDropItem`
+- `onCalculateDamage`, `onEventDropItem`
   These mutate gameplay outcomes and do not fit the default read-only advisor contract.
+
+Note: `onBeforeCombat` moved to adopted — the mod now uses it as a read-only advisor hook (returns inputs unchanged). `onLootDrop` is adopted for post-loot item guidance.

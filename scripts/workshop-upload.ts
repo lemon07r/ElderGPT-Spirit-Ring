@@ -9,6 +9,7 @@ type CliArgs = {
   tags?: string;
   previewImagePath?: string;
   allowCreate: boolean;
+  syncWorkshopPageCopy: boolean;
   zipPath: string;
   visibility: WorkshopVisibility;
   skipBuild: boolean;
@@ -32,9 +33,10 @@ Usage:
 Options:
   --change-note <text>        Change notes for the workshop update
   --workshop-id <id>          Override the default ElderGPT Spirit Ring workshop item ID
-  --title <text>              Optional workshop title override (default: ElderGPT Spirit Ring)
+  --title <text>              Optional workshop title override
   --description <text>        Optional workshop description override
   --tags <csv>                Optional comma-separated workshop tags
+  --sync-workshop-page        Push the repo title/description to the Workshop page on update
   --preview <path>            Optional preview image path (defaults to docs/assets/workshop-preview.png when present)
   --allow-create              Create a new workshop item when no workshop ID exists
   --zip <path>                Override the default build zip path
@@ -66,7 +68,7 @@ function readTextFileIfExists(filePath: string): string | undefined {
 
 function parseArgs(argv: string[]): CliArgs {
   const repoRoot = path.resolve(import.meta.dir, '..');
-  const defaultDescriptionPath = path.resolve(
+  const repoDescriptionPath = path.resolve(
     repoRoot,
     'docs',
     'assets',
@@ -80,9 +82,8 @@ function parseArgs(argv: string[]): CliArgs {
   );
   const parsed: CliArgs = {
     workshopId: DEFAULT_WORKSHOP_ID || undefined,
-    title: DEFAULT_WORKSHOP_TITLE,
-    description: readTextFileIfExists(defaultDescriptionPath),
     allowCreate: false,
+    syncWorkshopPageCopy: false,
     zipPath: path.resolve(repoRoot, 'builds', 'afnm-eldergpt-spirit-ring.zip'),
     previewImagePath: fs.existsSync(defaultPreviewImagePath)
       ? defaultPreviewImagePath
@@ -126,6 +127,9 @@ function parseArgs(argv: string[]): CliArgs {
         parsed.description = consumeValue(argv, index, arg);
         index += 1;
         break;
+      case '--sync-workshop-page':
+        parsed.syncWorkshopPageCopy = true;
+        break;
       case '--tags':
         parsed.tags = consumeValue(argv, index, arg);
         index += 1;
@@ -159,6 +163,11 @@ function parseArgs(argv: string[]): CliArgs {
       default:
         throw new Error(`Unknown argument: ${arg}`);
     }
+  }
+
+  if (parsed.allowCreate || parsed.syncWorkshopPageCopy) {
+    parsed.title ??= DEFAULT_WORKSHOP_TITLE;
+    parsed.description ??= readTextFileIfExists(repoDescriptionPath);
   }
 
   return parsed;

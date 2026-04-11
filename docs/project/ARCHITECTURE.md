@@ -4,7 +4,7 @@ status: active
 authoritative: true
 owner: eldergpt-maintainers
 last_verified: 2026-04-06
-source_of_truth: src/integration, src/ui, src/ai, src/config, live AFNM 0.6.49 runtime
+source_of_truth: src/integration, src/ui, src/ai, src/config, live AFNM 0.6.50 runtime
 review_cycle_days: 30
 related_files: src/integration/index.ts,src/integration/gameState.ts,src/integration/contextEngine.ts,src/integration/proactive.ts,src/ui/chatSession.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ai/client.ts
 ---
@@ -34,7 +34,7 @@ The current architecture has five parts:
 
 ## ModAPI-First Rules
 
-As of AFNM `0.6.49`, this mod should assume the following order of preference:
+As of AFNM `0.6.50`, this mod should assume the following order of preference:
 
 1. `window.modAPI.getGameStateSnapshot()` for read-only state.
 2. `window.modAPI.subscribe()` for reactive updates.
@@ -51,7 +51,8 @@ The repo currently adopts the new API in four places:
 - Context extraction now runs from the official live snapshot first.
 - The chat header reacts to live state through the official subscription path.
 - A `combat-victory` inline CTA is injected through `injectUI()` to open the chat from a real game dialog.
-- Proactive suggestions now use official lifecycle hooks for location entry, month rollover, long day advances, combat completion, and crafting completion.
+- Proactive suggestions now use official lifecycle hooks for location entry, month rollover, long day advances, combat completion, crafting completion, loot drops, and pre-combat advice.
+- Context extraction now includes `persistentEventLog` entries and `craftingTeamUpOverride` companion name for richer AI prompts.
 
 ## Deliberate Non-Adoption
 
@@ -60,11 +61,13 @@ Some new APIs are intentionally documented but not used by default yet:
 - `onReduxAction`
   This runs inside the reducer. It is powerful but high-risk for a read-only advisor mod and should only be used when a concrete need cannot be met by `subscribe()` and snapshots.
 
-- `onBeforeCombat` and `onCalculateDamage`
-  These are mutation hooks. They do not align with the mod’s observer-first design unless the project explicitly adds opt-in gameplay mutators later.
+- `onCalculateDamage`
+  This is a mutation hook. It does not align with the mod’s observer-first design unless the project explicitly adds opt-in gameplay mutators later.
 
 - `onEventDropItem`
   This changes rewards and therefore crosses the current read-only boundary.
+
+Note: `onBeforeCombat` is now adopted as a read-only advisor hook (returns inputs unchanged) and `onLootDrop` is adopted for post-loot guidance.
 
 ## Known Gaps
 

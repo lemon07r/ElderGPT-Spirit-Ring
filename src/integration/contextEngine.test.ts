@@ -16,6 +16,7 @@ function createSnapshot(overrides: Partial<RootState> = {}): RootState {
       flags: {},
       storedStates: {},
       analyticsToReport: [],
+      persistentEventLog: [],
     },
     combat: {
       player: undefined,
@@ -242,6 +243,83 @@ describe('extractContext', () => {
         location: 'Unknown Region',
       }),
     );
+  });
+
+  it('returns empty recentEvents when no persistent event log exists', () => {
+    const snapshot = createSnapshot();
+    const context = extractContext(snapshot);
+    expect(context.recentEvents).toEqual([]);
+  });
+
+  it('extracts the most recent 5 persistent event log entries', () => {
+    const entries = Array.from({ length: 7 }, (_, i) => ({
+      year: 2,
+      month: 3,
+      day: i + 1,
+      history: [{ text: `Event ${i + 1}`, sfx: 'confirm' as const }],
+    }));
+    const snapshot = createSnapshot({
+      gameEvent: {
+        ...createSnapshot().gameEvent,
+        persistentEventLog: entries,
+      },
+    });
+    const context = extractContext(snapshot);
+    expect(context.recentEvents).toHaveLength(5);
+    expect(context.recentEvents[0]).toEqual({
+      year: 2,
+      month: 3,
+      day: 1,
+      texts: ['Event 1'],
+    });
+    expect(context.recentEvents[4]).toEqual({
+      year: 2,
+      month: 3,
+      day: 5,
+      texts: ['Event 5'],
+    });
+  });
+
+  it('includes crafting companion from craftingTeamUpOverride', () => {
+    const snapshot = createSnapshot({
+      gameEvent: {
+        ...createSnapshot().gameEvent,
+        craftingTeamUpOverride: {
+          name: 'elder_mei_buff',
+          displayName: { key: 'Elder Mei' },
+          icon: 'mei.png',
+          canStack: false,
+          effects: [],
+          stacks: 1,
+          displayLocation: 'companion',
+        } as RootState['gameEvent']['craftingTeamUpOverride'],
+      },
+      crafting: {
+        player: undefined,
+        recipe: { name: 'Recuperation Pill (I)' } as RootState['crafting']['recipe'],
+        recipeStats: undefined,
+        progressState: undefined,
+        consumedPills: 0,
+        craftingLog: [],
+      },
+    });
+    const context = extractContext(snapshot);
+    expect(context.crafting?.companion).toBe('Elder Mei');
+  });
+
+  it('sets crafting companion to null when no craftingTeamUpOverride', () => {
+    const snapshot = createSnapshot({
+      crafting: {
+        player: undefined,
+        recipe: { name: 'Iron Pill (I)' } as RootState['crafting']['recipe'],
+        recipeStats: undefined,
+        progressState: undefined,
+        consumedPills: 0,
+        craftingLog: [],
+      },
+    });
+    const context = extractContext(snapshot);
+    expect(context.crafting?.companion).toBeNull();
   });
 
   it('normalizes combat and crafting state from the live snapshot shape', () => {

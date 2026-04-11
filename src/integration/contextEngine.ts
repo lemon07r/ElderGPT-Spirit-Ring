@@ -31,6 +31,14 @@ interface CraftingContext {
   step: number | null;
   consumedPills: number;
   recommendedTechniqueTypes: string[];
+  companion: string | null;
+}
+
+interface EventSummaryContext {
+  year: number;
+  month: number;
+  day: number;
+  texts: string[];
 }
 
 export interface GameContext {
@@ -49,6 +57,7 @@ export interface GameContext {
   flagCount: number;
   combat: CombatContext | null;
   crafting: CraftingContext | null;
+  recentEvents: EventSummaryContext[];
 }
 
 const DEFAULT_CONTEXT: GameContext = {
@@ -77,6 +86,7 @@ const DEFAULT_CONTEXT: GameContext = {
   flagCount: 0,
   combat: null,
   crafting: null,
+  recentEvents: [],
 };
 
 function asString(value: Translatable | string | undefined, fallback: string): string {
@@ -149,6 +159,8 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
       }
     : null;
 
+  const craftingTeamUp = snapshot.gameEvent.craftingTeamUpOverride;
+
   const crafting = snapshot.crafting.progressState || snapshot.crafting.recipe
     ? {
         recipe: snapshot.crafting.recipe?.name ?? null,
@@ -161,8 +173,20 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
         consumedPills: snapshot.crafting.consumedPills,
         recommendedTechniqueTypes:
           snapshot.crafting.progressState?.harmonyTypeData?.recommendedTechniqueTypes ?? [],
+        companion: craftingTeamUp
+          ? asString(craftingTeamUp.displayName, craftingTeamUp.name)
+          : null,
       }
     : null;
+
+  const recentEvents: EventSummaryContext[] = (snapshot.gameEvent.persistentEventLog ?? [])
+    .slice(0, 5)
+    .map((entry) => ({
+      year: entry.year,
+      month: entry.month,
+      day: entry.day,
+      texts: entry.history.map((h) => h.text),
+    }));
 
   return {
     source: getGameStateSource(),
@@ -192,6 +216,7 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
     flagCount: Object.keys(snapshot.gameData.flags ?? {}).length,
     combat,
     crafting,
+    recentEvents,
   };
 }
 
