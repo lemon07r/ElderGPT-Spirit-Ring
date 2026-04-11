@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/workshop-preview-magick.png" alt="ElderGPT Spirit Ring" width="480" />
+  <img src="docs/assets/workshop-preview.png" alt="ElderGPT Spirit Ring" width="480" />
 </p>
 
 <h1 align="center">ElderGPT Spirit Ring</h1>
@@ -12,7 +12,7 @@
   <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3701616500">
     <img src="https://img.shields.io/badge/Steam_Workshop-Subscribe-1b2838?logo=steam&logoColor=white" alt="Steam Workshop" />
   </a>
-  <img src="https://img.shields.io/badge/AFNM-0.6.49+-blue" alt="Game Version" />
+  <img src="https://img.shields.io/badge/AFNM-0.6.50+-blue" alt="Game Version" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
 
@@ -24,12 +24,16 @@ It is **read-only by design**: it does not automate combat, spend resources, or 
 
 ## Features
 
-- 💬 **Persistent chat overlay** — open it from the floating Spirit Ring button; minimize and reopen without losing the conversation.
+- 💬 **Persistent chat with sessions** — conversations are saved automatically. Switch between chats, start new ones, or pick up where you left off.
+- 🧠 **Deep game knowledge** — the AI is fed relevant crafting, combat, and cultivation knowledge based on your current activity, distilled from comprehensive game mechanics documentation.
 - 🎯 **Live context** — advice is grounded in your current run (realm, HP, location, combat state, crafting progress), not a generic wiki answer.
-- ⚡ **Proactive hints** — optional post-event suggestions after combat victories, travel, crafting completions, and time skips.
+- 📊 **Smart context management** — automatically detects your model's context window and compacts long conversations so the AI never loses track.
+- ⚡ **Streaming responses** — see words as the AI responds, with markdown formatting and a loading animation.
+- 🔔 **Proactive hints** — optional post-event suggestions after combat victories, travel, crafting completions, and time skips.
 - 🏆 **Combat victory CTA** — a quick "Ask the Spirit Ring" button appears on the win screen via `modAPI.injectUI()`.
 - 🎭 **Personas** — choose between the lore-flavored *Elder* voice, the analytical *Calculator*, or write your own *Custom* persona prompt.
-- 🔌 **Bring your own model** — any OpenAI-compatible endpoint works (hosted providers, local servers, etc.).
+- 🔌 **Bring your own model** — any OpenAI-compatible endpoint works (hosted providers, local servers, Anthropic, etc.).
+- 🎨 **Customizable UI** — adjust text size, window size, and drag the panel anywhere. Position persists across sessions.
 
 ## What You Can Ask
 
@@ -42,6 +46,8 @@ It is **read-only by design**: it does not automate combat, spend resources, or 
 > *"What am I missing in this crafting setup?"*
 >
 > *"Which stats or resources are holding me back?"*
+>
+> *"Explain how Inscribed Patterns harmony works."*
 
 ## Installation (Players)
 
@@ -71,7 +77,7 @@ Run your own OpenAI-compatible server with [llama.cpp](https://github.com/ggml-o
 
 If your local server exposes an OpenAI-compatible `/v1` endpoint, ElderGPT Spirit Ring can use it.
 
-> **Tip:** Faster models usually feel better for moment-to-moment gameplay.
+> **Tip:** Faster models usually feel better for moment-to-moment gameplay. The mod auto-detects your model's context window and output limits when possible, but you can override them in Settings.
 
 ## Development
 
@@ -110,22 +116,34 @@ bun install
 src/
 ├── mod.ts                  # Mod entry point and metadata
 ├── ai/
-│   └── client.ts           # OpenAI-compatible chat completions transport
+│   ├── client.ts           # Multi-provider chat completions transport
+│   ├── compaction.ts       # Conversation compaction via anchored iterative summarization
+│   ├── modelLimits.ts      # Model context/output limit detection and static fallback table
+│   ├── tokenEstimator.ts   # Token count estimation heuristic
+│   └── knowledge/          # Dynamic game knowledge injection
+│       ├── index.ts        # State-aware knowledge selector with token budgeting
+│       ├── gameOverview.ts # Always-included AFNM game overview
+│       ├── combatKnowledge.ts    # Combat-state knowledge block
+│       ├── craftingKnowledge.ts  # Crafting-state knowledge block
+│       └── cultivationKnowledge.ts # General cultivation/progression knowledge
 ├── config/
 │   └── settings.ts         # Persisted settings store (localStorage)
 ├── integration/
 │   ├── gameState.ts        # Live game state bridge (modAPI → fallback)
-│   ├── contextEngine.ts    # Normalizes snapshots into compact GameContext
+│   ├── contextEngine.ts    # System prompt builder with formatted context and knowledge injection
 │   ├── proactive.ts        # Proactive suggestion hooks (post-combat, travel, etc.)
 │   ├── uiBridge.tsx        # modAPI.injectUI() entry points
 │   └── index.ts            # Integration bootstrap
 ├── ui/
 │   ├── index.tsx            # Overlay mount and React root
 │   ├── ElderGPTApp.tsx      # Top-level app component
-│   ├── chatSession.ts       # Conversation state store
+│   ├── chatSession.ts       # Conversation state store with session persistence
+│   ├── sessionManager.ts    # Session CRUD, auto-naming, and localStorage persistence
 │   └── components/
-│       ├── ChatPanel.tsx    # Main chat interface
-│       ├── SettingsPanel.tsx # Settings UI
+│       ├── ChatPanel.tsx    # Main chat interface with session management
+│       ├── SettingsPanel.tsx # Settings UI with model limit detection
+│       ├── MarkdownText.tsx # Markdown renderer for assistant messages
+│       ├── LoadingAnimation.tsx # Animated loading indicator
 │       └── SpiritRingToggle.tsx # Floating toggle button
 └── utils/                   # Generic helpers
 ```
@@ -142,17 +160,19 @@ src/
 │       │                                    │                 │
 │       ▼                                    ▼                 │
 │  proactive.ts                     getSystemPrompt()          │
-│  (hooks: combat,                         │                   │
-│   location, time,                        ▼                   │
-│   crafting)              ┌─────── ai/client.ts ───────┐      │
-│       │                  │   POST /chat/completions    │      │
+│  (hooks: combat,                    + knowledge/             │
+│   location, time,                  (dynamic injection)       │
+│   crafting, loot)                        │                   │
+│       │                                  ▼                   │
+│       ▼                  ┌─────── ai/client.ts ───────┐      │
+│  appendAssistantMessage()│   POST /chat/completions    │      │
+│       │                  │   + max_tokens              │      │
 │       ▼                  └─────────────────────────────┘      │
-│  appendAssistantMessage()         ▲                           │
-│       │                           │                           │
-│       ▼                           │                           │
 │  ┌─ ui/ ──────────────────────────┘                          │
-│  │  ChatPanel ◄─► chatSession store                          │
-│  │  SettingsPanel ◄─► settings store                         │
+│  │  ChatPanel ◄─► chatSession store ◄─► sessionManager      │
+│  │     │              │                                      │
+│  │     │         compaction.ts (auto-summarize long chats)   │
+│  │  SettingsPanel ◄─► settings store ◄─► modelLimits.ts     │
 │  │  SpiritRingToggle (floating FAB)                          │
 │  └───────────────────────────────────────────────────────────┘
 │                                                              │
@@ -160,7 +180,7 @@ src/
 └──────────────────────────────────────────────────────────────┘
 ```
 
-The mod follows a strict **modAPI-first** policy (as of AFNM `0.6.49`):
+The mod follows a strict **modAPI-first** policy (as of AFNM `0.6.50`):
 
 1. `window.modAPI.getGameStateSnapshot()` for read-only state
 2. `window.modAPI.subscribe()` for reactive updates
@@ -196,9 +216,9 @@ Authoritative project docs live in `docs/project/`:
 |----------|---------|
 | [ARCHITECTURE.md](docs/project/ARCHITECTURE.md) | Runtime shape and modAPI adoption |
 | [CONCEPT_PLAN.md](docs/project/CONCEPT_PLAN.md) | Product direction and anti-goals |
-| [CONTEXT_ENGINE.md](docs/project/CONTEXT_ENGINE.md) | How game state is normalized for prompting |
-| [AI_CLIENT.md](docs/project/AI_CLIENT.md) | Transport layer design |
-| [UI_ARCHITECTURE.md](docs/project/UI_ARCHITECTURE.md) | Overlay and component design |
+| [CONTEXT_ENGINE.md](docs/project/CONTEXT_ENGINE.md) | How game state is normalized and prompted |
+| [AI_CLIENT.md](docs/project/AI_CLIENT.md) | Transport layer and model limit detection |
+| [UI_ARCHITECTURE.md](docs/project/UI_ARCHITECTURE.md) | Overlay, session management, and component design |
 | [LIVE_GAME_TESTING.md](docs/project/LIVE_GAME_TESTING.md) | How to test against the real game |
 | [RELEASE_PROCESS.md](docs/project/RELEASE_PROCESS.md) | Version bumps, builds, and publishing |
 
@@ -206,6 +226,8 @@ Authoritative project docs live in `docs/project/`:
 
 - This mod does **not** include an API key or a bundled model.
 - Advice quality depends heavily on the model you choose.
+- Long conversations are automatically summarized to stay within context limits.
+- The mod auto-detects model context/output limits from Anthropic, LM Studio, and Ollama APIs, with a static fallback table for other providers.
 - Proactive hints are optional and can be disabled in Settings.
 - The mod is read-only — it never mutates game state, Redux store, or gameplay.
 

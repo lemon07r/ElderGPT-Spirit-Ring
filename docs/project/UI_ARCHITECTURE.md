@@ -4,9 +4,9 @@ status: active
 authoritative: true
 owner: eldergpt-maintainers
 last_verified: 2026-04-11
-source_of_truth: src/ui + src/ui/chatSession.ts + src/config/settings.ts + src/integration/uiBridge.tsx
+source_of_truth: src/ui + src/ui/chatSession.ts + src/ui/sessionManager.ts + src/config/settings.ts + src/integration/uiBridge.tsx
 review_cycle_days: 30
-related_files: src/ui/index.tsx,src/ui/ElderGPTApp.tsx,src/ui/chatSession.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ui/components/SpiritRingToggle.tsx,src/integration/uiBridge.tsx
+related_files: src/ui/index.tsx,src/ui/ElderGPTApp.tsx,src/ui/chatSession.ts,src/ui/sessionManager.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ui/components/SettingsPanel.tsx,src/ui/components/SpiritRingToggle.tsx,src/integration/uiBridge.tsx
 ---
 
 # UI Architecture
@@ -35,11 +35,6 @@ Current usage:
 - `combat-victory`
   An inline `Consult Spirit Ring` button is injected into the victory dialog and dispatches the same open event used by the persistent overlay.
 
-Why only a targeted use today:
-
-- `injectUI()` is excellent for context-specific entry points.
-- It is not yet a clean replacement for a persistent cross-screen chat launcher unless we commit to managing slot coverage across the whole game UI.
-
 ## Component Roles
 
 - `ElderGPTApp`
@@ -49,21 +44,33 @@ Why only a targeted use today:
   The minimized floating affordance. It handles open/drag behavior and surfaces unread assistant messages while the panel is closed.
 
 - `ChatPanel`
-  The main conversation surface. It reads live game state through `useSyncExternalStore(subscribeToGameState, readGameStateSnapshot, ...)`, reads settings/chat state from external stores, shows a small state/source header, and exposes stable accessibility labels for smoke automation.
+  The main conversation surface. Reads live game state through `useSyncExternalStore`, reads settings/chat state from external stores. Features:
+  - Connection status indicator (green/yellow/red dot replacing dev jargon)
+  - Session name display for non-default sessions
+  - Session history panel with switch/delete
+  - New Chat button in header
+  - Dynamic knowledge injection and compaction trigger before each send
+  - Markdown rendering for assistant messages
+  - Streaming response display with loading animation
 
 - `SettingsPanel`
-  Thin editor for the shared settings store. Surfaces the API provider selector (OpenAI / Anthropic), request timeout slider (10--999s), and existing fields. It should remain ignorant of runtime integration details beyond clear user-facing labels.
+  Settings editor with: API provider selector, notched timeout slider, persona buttons (Elder/Calculator/Custom), text/window size controls, streaming toggle, proactive hints toggle. New: context window and max output token settings with auto-detection display from `modelLimits.ts`.
 
-- `chatSession` store
-  Holds message history, loading state, panel visibility, and unread count outside the panel component so minimizing the overlay does not destroy the conversation.
+- `MarkdownText`
+  Renders assistant messages with code blocks, inline code, bold, italic, lists, headers, and horizontal rules.
 
-- `settings` store
-  Owns validated persisted settings and provides a single snapshot path for UI and proactive integrations.
+- `LoadingAnimation`
+  Animated yin-yang glyph with floating text and pulsing dots while waiting for AI response.
+
+## Session Management
+
+- `sessionManager.ts` -- Session CRUD with localStorage persistence. Sessions store `{ id, name, messages[], createdAt, updatedAt }`. Auto-naming from first user message. Max 20 sessions with oldest pruned.
+- `chatSession.ts` -- Integrates with `sessionManager` for persistence. Restores active session on load. Auto-saves after each message. `startNewChat()` saves current session and creates a fresh one. `switchToSession()` saves and loads.
 
 ## State Boundaries
 
 - Ephemeral UI state stays local React state.
-- Conversation/session state lives in `src/ui/chatSession.ts`.
+- Conversation/session state lives in `src/ui/chatSession.ts` backed by `src/ui/sessionManager.ts`.
 - Persisted configuration lives in `src/config/settings.ts`.
 - Game state comes from the official snapshot/subscription bridge.
 - Cross-entry-point open behavior uses a small custom event bridge instead of wiring UI concerns into the game-state adapter.

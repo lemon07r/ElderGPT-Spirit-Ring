@@ -9,10 +9,14 @@ ElderGPT Spirit Ring reads your live game state through the official modAPI, bui
 [*][b]Read-only by design[/b] - it does not automate combat, spend resources, or make choices for you.
 [*][b]Always nearby[/b] - open it from the floating Spirit Ring button, or from the combat victory screen.
 [*][b]Live context[/b] - advice is grounded in your current run, not a generic wiki answer.
-[*][b]Persistent chat[/b] - minimize it and reopen later without losing the conversation.
+[*][b]Deep game knowledge[/b] - the AI is fed relevant crafting, combat, and cultivation knowledge based on what you are doing right now.
+[*][b]Persistent chat with sessions[/b] - conversations are saved automatically. Switch between chats, start new ones, or pick up where you left off.
+[*][b]Smart context management[/b] - automatically detects your model's context window and compacts long conversations so the AI never loses track.
+[*][b]Streaming responses[/b] - see words as the AI responds, with markdown formatting and a loading animation.
 [*][b]Optional proactive hints[/b] - it can chime in after important moments like combat, travel, crafting, and time skips.
 [*][b]Bring your own model[/b] - works with OpenAI-compatible providers, Anthropic API endpoints, or local servers.
 [*][b]Configurable timeout[/b] - increase the request timeout up to 999 seconds for slow or distributed inference setups.
+[*][b]Customizable UI[/b] - adjust text size, window size, and drag the panel anywhere on screen. Position persists across sessions.
 [/list]
 
 [h2]What you can ask it[/h2]
@@ -26,6 +30,8 @@ ElderGPT Spirit Ring reads your live game state through the official modAPI, bui
 "What am I missing in this crafting setup?"
 
 "Which stats or resources are holding me back?"
+
+"Explain how Inscribed Patterns harmony works."
 [/quote]
 
 [h2]Quick start[/h2]
@@ -35,6 +41,13 @@ ElderGPT Spirit Ring reads your live game state through the official modAPI, bui
 [*]Enter your API URL, API key, and model ID.
 [*]Pick a persona if you want.
 [*]Ask for advice normally in plain language.
+[/list]
+
+[h2]Personas[/h2]
+[list]
+[*][b]Elder[/b] - An ancient cultivation elder who speaks in Xianxia idioms. Gives advice framed through Dao philosophy while referencing actual game mechanics.
+[*][b]Calculator[/b] - A cold optimization engine. Leads with numbers, percentages, and comparisons. No fluff.
+[*][b]Custom[/b] - Write your own persona prompt. The AI still receives live game state and knowledge context.
 [/list]
 
 [h2]Recommended AI setup options[/h2]
@@ -72,9 +85,18 @@ If your local runner exposes an OpenAI-compatible [code]/v1[/code] endpoint, Eld
 [*]This mod does not include an API key or a bundled model.
 [*]Advice quality depends heavily on the model you choose.
 [*]Faster models usually feel better for moment-to-moment gameplay.
+[*]The mod auto-detects your model's context window and output limits when possible, but you can override them in Settings.
+[*]Long conversations are automatically summarized to stay within context limits.
 [*]Proactive hints are optional and can be disabled in Settings.
 [/list]
 
 [h2]Feedback and bugs[/h2]
 If the advice feels wrong, confusing, or out of date, leave a comment with what was happening in-game and what the mod told you.
 That is the fastest way to improve it.
+
+[h1]My Other Mods[/h1]
+[list]
+[*][url=https://steamcommunity.com/sharedfiles/filedetails/?id=3661729323]CraftBuddy[/url] - A live crafting optimizer overlay with AutoBuddy auto mode
+[*][url=https://steamcommunity.com/sharedfiles/filedetails/?id=3694065051]Lucky All Around[/url] - Configurable pity-event luck weighting for Explore events
+[/list]
+[url=https://steamcommunity.com/sharedfiles/filedetails/?id=3704747572]View all my mods in my AFNM mod collection[/url]

@@ -6,7 +6,7 @@ owner: eldergpt-maintainers
 last_verified: 2026-04-11
 source_of_truth: src/integration, src/ui, src/ai, src/config, live AFNM 0.6.50 runtime
 review_cycle_days: 30
-related_files: src/integration/index.ts,src/integration/gameState.ts,src/integration/contextEngine.ts,src/integration/proactive.ts,src/ui/chatSession.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ai/client.ts
+related_files: src/integration/index.ts,src/integration/gameState.ts,src/integration/contextEngine.ts,src/integration/proactive.ts,src/ui/chatSession.ts,src/ui/sessionManager.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ai/client.ts,src/ai/knowledge/index.ts,src/ai/compaction.ts,src/ai/modelLimits.ts
 ---
 
 # Architecture
@@ -15,22 +15,28 @@ ElderGPT Spirit Ring is a read-only advisor mod. The mod should observe the live
 
 ## Runtime Shape
 
-The current architecture has five parts:
+The current architecture has seven parts:
 
 1. `src/integration/gameState.ts`
    This is the single bridge into live game state. It prefers `window.modAPI.getGameStateSnapshot()` and `window.modAPI.subscribe()`, then falls back to `window.gameStore` only if the official API is unavailable.
 
 2. `src/integration/contextEngine.ts`
-   This normalizes the raw snapshot into a compact `GameContext` object for prompting and UI status. Game-shape knowledge belongs here, not spread across UI components.
+   This normalizes the raw snapshot into a compact `GameContext` object and builds the system prompt. System prompts include expanded persona instructions, dynamic knowledge injection, human-readable formatted game state, and response guidelines. Game-shape knowledge belongs here, not spread across UI components.
 
-3. `src/ui/*`
-   The main chat UI is still a persistent body-mounted overlay because that gives a stable cross-screen affordance. We now also use `window.modAPI.injectUI()` for targeted in-game entry points where it improves UX without replacing the persistent overlay.
+3. `src/ai/knowledge/`
+   Dynamic game knowledge system. Maintains compiled knowledge blocks for crafting, combat, and cultivation that are injected into prompts based on current game state. The selector function respects a token budget to avoid crowding out conversation history.
 
-4. `src/ui/chatSession.ts` and `src/config/settings.ts`
-   Conversation history, unread state, loading state, and settings now live in tiny external stores. This avoids losing chat state when the panel is minimized and gives non-React integration code a safe way to read current settings.
+4. `src/ai/client.ts`, `src/ai/modelLimits.ts`, `src/ai/compaction.ts`
+   Multi-provider chat client supporting OpenAI-compatible and Anthropic endpoints with streaming. Model limit detection probes provider-specific APIs (Anthropic, LM Studio, Ollama) with a static fallback table. Conversation compaction uses anchored iterative summarization to keep long conversations within context limits.
 
-5. `src/ai/client.ts`
-   Multi-provider chat client supporting OpenAI-compatible and Anthropic endpoints. The provider and request timeout are user-configurable through settings. It should stay transport-focused and not absorb game-specific logic.
+5. `src/ui/*`
+   The main chat UI is a persistent body-mounted overlay. We also use `window.modAPI.injectUI()` for targeted in-game entry points. The chat panel includes session management (history, switching, new chat), connection status indicator, markdown rendering, and streaming display.
+
+6. `src/ui/chatSession.ts` and `src/ui/sessionManager.ts`
+   Conversation history, unread state, loading state, and session persistence. Sessions are stored in localStorage with auto-naming. The session manager handles CRUD, active session tracking, and automatic pruning at 20 sessions.
+
+7. `src/config/settings.ts`
+   Persisted settings including API configuration, persona, UI preferences, context/output limit overrides, and streaming toggle.
 
 ## ModAPI-First Rules
 
@@ -62,7 +68,7 @@ Some new APIs are intentionally documented but not used by default yet:
   This runs inside the reducer. It is powerful but high-risk for a read-only advisor mod and should only be used when a concrete need cannot be met by `subscribe()` and snapshots.
 
 - `onCalculateDamage`
-  This is a mutation hook. It does not align with the mod’s observer-first design unless the project explicitly adds opt-in gameplay mutators later.
+  This is a mutation hook. It does not align with the mod's observer-first design unless the project explicitly adds opt-in gameplay mutators later.
 
 - `onEventDropItem`
   This changes rewards and therefore crosses the current read-only boundary.
