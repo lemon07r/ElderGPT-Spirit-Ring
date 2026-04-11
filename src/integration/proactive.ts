@@ -109,7 +109,13 @@ async function processQueue() {
 
       const settings = readSettingsSnapshot();
       const context = extractContext(readGameStateSnapshot());
-      const client = new AIClient(settings.apiUrl, settings.apiKey, settings.modelId);
+      const client = new AIClient({
+        url: settings.apiUrl,
+        apiKey: settings.apiKey,
+        modelId: settings.modelId,
+        provider: settings.provider,
+        timeoutMs: settings.requestTimeoutSeconds * 1000,
+      });
       const response = await client.chat([
         {
           role: 'system',

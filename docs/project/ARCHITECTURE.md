@@ -3,7 +3,7 @@ title: Mod Architecture
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-06
+last_verified: 2026-04-11
 source_of_truth: src/integration, src/ui, src/ai, src/config, live AFNM 0.6.50 runtime
 review_cycle_days: 30
 related_files: src/integration/index.ts,src/integration/gameState.ts,src/integration/contextEngine.ts,src/integration/proactive.ts,src/ui/chatSession.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ai/client.ts
@@ -30,7 +30,7 @@ The current architecture has five parts:
    Conversation history, unread state, loading state, and settings now live in tiny external stores. This avoids losing chat state when the panel is minimized and gives non-React integration code a safe way to read current settings.
 
 5. `src/ai/client.ts`
-   This is a minimal OpenAI-compatible POST client. It should stay transport-focused and not absorb game-specific logic.
+   Multi-provider chat client supporting OpenAI-compatible and Anthropic endpoints. The provider and request timeout are user-configurable through settings. It should stay transport-focused and not absorb game-specific logic.
 
 ## ModAPI-First Rules
 

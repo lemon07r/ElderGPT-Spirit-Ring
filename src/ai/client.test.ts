@@ -16,6 +16,22 @@ describe('AIClient', () => {
     );
   });
 
+  test('normalizes Anthropic URLs to messages endpoints', () => {
+    expect(normalizeChatUrl('https://api.anthropic.com', 'anthropic')).toBe(
+      'https://api.anthropic.com/v1/messages',
+    );
+    expect(normalizeChatUrl('https://api.anthropic.com/v1/messages', 'anthropic')).toBe(
+      'https://api.anthropic.com/v1/messages',
+    );
+    expect(normalizeChatUrl('https://api.minimax.io/anthropic', 'anthropic')).toBe(
+      'https://api.minimax.io/anthropic/messages',
+    );
+  });
+
+  test('defaults to Anthropic messages endpoint when URL is empty and provider is anthropic', () => {
+    expect(normalizeChatUrl('', 'anthropic')).toBe('https://api.anthropic.com/v1/messages');
+  });
+
   test('parses structured assistant content arrays', async () => {
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
@@ -93,5 +109,106 @@ describe('AIClient', () => {
     const response = await client.chat([{ role: 'user', content: 'Guide me.' }]);
 
     expect(response).toContain('Bad API key');
+  });
+
+  test('uses configurable timeout from options', async () => {
+    const fetchMock = jest.fn().mockImplementation((_url: string, init: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted.', 'AbortError'));
+        });
+      });
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const client = new AIClient({
+      url: 'http://localhost:1234',
+      apiKey: '',
+      modelId: 'test',
+      timeoutMs: 100,
+    });
+
+    const response = await client.chat([{ role: 'user', content: 'Guide me.' }]);
+    expect(response).toContain('timed out');
+  }, 10_000);
+
+  describe('Anthropic provider', () => {
+    test('sends system message as top-level parameter', async () => {
+      const fetchMock = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          content: [{ type: 'text', text: 'The elder speaks.' }],
+        }),
+      });
+
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const client = new AIClient({
+        url: 'https://api.anthropic.com',
+        apiKey: 'test-key',
+        modelId: 'claude-3',
+        provider: 'anthropic',
+      });
+
+      const response = await client.chat([
+        { role: 'system', content: 'You are an elder.' },
+        { role: 'user', content: 'Guide me.' },
+      ]);
+
+      expect(response).toBe('The elder speaks.');
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body.system).toBe('You are an elder.');
+      expect(body.messages).toEqual([{ role: 'user', content: 'Guide me.' }]);
+      expect(body.max_tokens).toBe(4096);
+    });
+
+    test('uses x-api-key header and anthropic-version', async () => {
+      const fetchMock = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          content: [{ type: 'text', text: 'ok' }],
+        }),
+      });
+
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const client = new AIClient({
+        url: 'https://api.anthropic.com',
+        apiKey: 'sk-ant-test',
+        modelId: 'claude-3',
+        provider: 'anthropic',
+      });
+
+      await client.chat([{ role: 'user', content: 'test' }]);
+
+      const headers = fetchMock.mock.calls[0][1].headers;
+      expect(headers['x-api-key']).toBe('sk-ant-test');
+      expect(headers['anthropic-version']).toBe('2023-06-01');
+      expect(headers['Authorization']).toBeUndefined();
+    });
+
+    test('surfaces Anthropic error bodies', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({
+          error: {
+            type: 'authentication_error',
+            message: 'Invalid API key',
+          },
+        }),
+      }) as unknown as typeof fetch;
+
+      const client = new AIClient({
+        url: 'https://api.anthropic.com',
+        apiKey: 'bad',
+        modelId: 'claude-3',
+        provider: 'anthropic',
+      });
+
+      const response = await client.chat([{ role: 'user', content: 'test' }]);
+      expect(response).toContain('Invalid API key');
+    });
   });
 });

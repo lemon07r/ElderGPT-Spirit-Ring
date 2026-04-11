@@ -97,7 +97,13 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
     setChatLoading(true);
 
     const systemContent = getSystemPrompt(settings.persona, settings.customPrompt, context);
-    const client = new AIClient(settings.apiUrl, settings.apiKey, settings.modelId);
+    const client = new AIClient({
+      url: settings.apiUrl,
+      apiKey: settings.apiKey,
+      modelId: settings.modelId,
+      provider: settings.provider,
+      timeoutMs: settings.requestTimeoutSeconds * 1000,
+    });
 
     try {
       const response = await client.chat([{ role: 'system', content: systemContent }, ...history]);

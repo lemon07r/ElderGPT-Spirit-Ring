@@ -3,7 +3,7 @@ title: UI Architecture
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-06
+last_verified: 2026-04-11
 source_of_truth: src/ui + src/ui/chatSession.ts + src/config/settings.ts + src/integration/uiBridge.tsx
 review_cycle_days: 30
 related_files: src/ui/index.tsx,src/ui/ElderGPTApp.tsx,src/ui/chatSession.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ui/components/SpiritRingToggle.tsx,src/integration/uiBridge.tsx
@@ -52,7 +52,7 @@ Why only a targeted use today:
   The main conversation surface. It reads live game state through `useSyncExternalStore(subscribeToGameState, readGameStateSnapshot, ...)`, reads settings/chat state from external stores, shows a small state/source header, and exposes stable accessibility labels for smoke automation.
 
 - `SettingsPanel`
-  Thin editor for the shared settings store. It should remain ignorant of runtime integration details beyond clear user-facing labels.
+  Thin editor for the shared settings store. Surfaces the API provider selector (OpenAI / Anthropic), request timeout slider (10--999s), and existing fields. It should remain ignorant of runtime integration details beyond clear user-facing labels.
 
 - `chatSession` store
   Holds message history, loading state, panel visibility, and unread count outside the panel component so minimizing the overlay does not destroy the conversation.

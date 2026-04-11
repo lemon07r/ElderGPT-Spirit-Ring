@@ -3,25 +3,38 @@ title: AI Client
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-06
+last_verified: 2026-04-11
 source_of_truth: src/ai/client.ts + src/ui/components/ChatPanel.tsx
 review_cycle_days: 30
-related_files: src/ai/client.ts,src/ui/components/ChatPanel.tsx,src/integration/contextEngine.ts
+related_files: src/ai/client.ts,src/ui/components/ChatPanel.tsx,src/integration/contextEngine.ts,src/config/settings.ts
 ---
 
 # AI Client
 
-The current AI transport is intentionally small. It posts an OpenAI-compatible payload to a user-supplied endpoint and returns the first assistant message.
+The AI transport supports two provider modes and posts to a user-supplied endpoint, returning the first assistant message.
 
-## Current Behavior
+## Supported Providers
 
-- Endpoint shape: normalizes a base URL or full `/v1/chat/completions` URL into the final OpenAI-compatible endpoint
-- Auth: optional bearer token
+### OpenAI-compatible (default)
+
+- Endpoint shape: normalizes a base URL or full `/v1/chat/completions` URL into the final endpoint
+- Auth: optional `Authorization: Bearer <key>` header
 - Payload: `model`, `messages`, `temperature`
-- Default model fallback: `kimi-k2.5` when no model ID is configured
 - Response handling: string content or structured text-part arrays from `choices[0].message.content`
-- Timeout: 30 seconds
-- Error handling: return a short in-universe system error string instead of throwing into the UI
+
+### Anthropic
+
+- Endpoint shape: normalizes a base URL or full `/v1/messages` URL into the final endpoint; also handles `/anthropic`-suffixed proxy paths
+- Auth: `x-api-key` header + `anthropic-version: 2023-06-01` header
+- Payload: `model`, `messages` (non-system only), `system` (top-level string extracted from system messages), `max_tokens`, `temperature`
+- Response handling: text-part arrays from `content[].text`
+
+## Common Behavior
+
+- Default model fallback: `kimi-k2.5` when no model ID is configured
+- Timeout: user-configurable (10--999 seconds, default 30), stored as `requestTimeoutSeconds` in settings and passed as `timeoutMs` to the client
+- Error handling: returns a short in-universe system error string instead of throwing into the UI
+- Constructor: accepts either the legacy `(url, apiKey, modelId)` positional args or an `AIClientOptions` object with `url`, `apiKey`, `modelId?`, `provider?`, `timeoutMs?`
 
 ## What Stays Out Of This Layer
 
@@ -54,4 +67,4 @@ The current system prompt format is:
 
 ## Accuracy Rule
 
-Keep transport logic provider-agnostic, but keep documentation accurate: the current code is OpenAI-compatible only. Do not document Anthropic-native or other provider-specific behavior unless the implementation actually supports it.
+Keep documentation accurate to the implemented provider support. Do not document provider-specific behavior unless the implementation actually supports it.

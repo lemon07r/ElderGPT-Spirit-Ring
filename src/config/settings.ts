@@ -1,4 +1,5 @@
 export type Persona = 'Elder' | 'Calculator' | 'Custom';
+export type ApiProvider = 'openai' | 'anthropic';
 
 export interface ChatSettings {
   apiUrl: string;
@@ -7,9 +8,15 @@ export interface ChatSettings {
   persona: Persona;
   customPrompt: string;
   proactiveEnabled: boolean;
+  provider: ApiProvider;
+  requestTimeoutSeconds: number;
 }
 
 export const SETTINGS_STORAGE_KEY = 'eldergpt_settings';
+
+export const MIN_TIMEOUT_SECONDS = 10;
+export const MAX_TIMEOUT_SECONDS = 999;
+export const DEFAULT_TIMEOUT_SECONDS = 30;
 
 export const DEFAULT_SETTINGS: ChatSettings = {
   apiUrl: 'http://localhost:1234/v1/chat/completions',
@@ -18,6 +25,8 @@ export const DEFAULT_SETTINGS: ChatSettings = {
   persona: 'Elder',
   customPrompt: '',
   proactiveEnabled: false,
+  provider: 'openai',
+  requestTimeoutSeconds: DEFAULT_TIMEOUT_SECONDS,
 };
 
 const MOD_TAG = '[ElderGPT]';
@@ -29,6 +38,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function normalizePersona(value: unknown): Persona {
   return value === 'Calculator' || value === 'Custom' ? value : 'Elder';
+}
+
+function normalizeProvider(value: unknown): ApiProvider {
+  return value === 'anthropic' ? 'anthropic' : 'openai';
+}
+
+function normalizeTimeout(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_TIMEOUT_SECONDS;
+  }
+  return Math.max(MIN_TIMEOUT_SECONDS, Math.min(MAX_TIMEOUT_SECONDS, Math.round(value)));
 }
 
 function normalizeSettings(value: unknown): ChatSettings {
@@ -46,6 +66,8 @@ function normalizeSettings(value: unknown): ChatSettings {
       typeof value.proactiveEnabled === 'boolean'
         ? value.proactiveEnabled
         : DEFAULT_SETTINGS.proactiveEnabled,
+    provider: normalizeProvider(value.provider),
+    requestTimeoutSeconds: normalizeTimeout(value.requestTimeoutSeconds),
   };
 }
 
