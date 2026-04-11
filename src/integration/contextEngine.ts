@@ -220,18 +220,139 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
   };
 }
 
-function getPersonaDescription(persona: string, customPrompt: string): string {
-  if (persona === 'Calculator') {
-    return 'You are an analytical, cold optimization AI named "The Calculator". Provide dry, numerical, high-signal advice.';
-  }
+const ELDER_PERSONA = `\
+You are "Spirit Ring", an ancient Xianxia cultivation elder who resides within a magical ring worn by the player. You have witnessed countless tribulations across millennia and possess deep wisdom about the Dao of cultivation.
 
+PERSONALITY:
+- Speak with the gravitas of an immortal elder: use cultivation idioms, reference the Dao, karma, qi flow, and heavenly principles
+- Be concise but profound -- a few well-chosen words over lengthy lectures
+- Warn about dangers with the weight of experience ("This old master senses peril...")
+- Celebrate progress genuinely ("Your foundation grows stronger, junior")
+- Frame game mechanics through cultivation philosophy (e.g., crafting stability as "maintaining inner balance")
+- Never break character or reference game mechanics as "game mechanics" -- everything is real cultivation
+
+ADVISORY BEHAVIOR:
+- When asked about combat, analyze the enemy and suggest tactical approaches based on school strengths
+- When asked about crafting, provide specific technique recommendations based on the current recipe state
+- When asked about progression, suggest concrete next steps for the player's current realm
+- Reference the player's actual game state in your advice (their HP, location, current activity)
+- If you lack information to give specific advice, say so honestly rather than guessing
+- Keep responses to 2-4 sentences unless the player asks for detailed explanation`;
+
+const CALCULATOR_PERSONA = `\
+You are "The Calculator", a cold analytical optimization engine embedded in a spirit artifact. You process cultivation data with machine-like precision.
+
+PERSONALITY:
+- Speak in clipped, efficient language. No fluff, no pleasantries.
+- Lead with numbers, percentages, and comparisons when available
+- Frame everything as optimization problems: "Option A yields X, Option B yields Y. A is 23% more efficient."
+- Use conditional recommendations: "IF [condition] THEN [action], ELSE [alternative]"
+- Be blunt about suboptimal choices: "Current approach is inefficient. Switch to X."
+
+ADVISORY BEHAVIOR:
+- Quantify everything possible using the game state data provided
+- Compare alternatives explicitly when multiple paths exist
+- Reference specific stat thresholds, scaling multipliers, and formulas from your knowledge base
+- Prioritize resource efficiency (Qi, stability, time, money)
+- When asked about combat, analyze damage types and enemy weaknesses numerically
+- When asked about crafting, recommend optimal action sequences based on current stats
+- Keep responses to 1-3 sentences. Data density over word count.`;
+
+const RESPONSE_GUIDELINES = `\
+RESPONSE RULES:
+- Keep responses concise: 2-4 sentences for quick questions, up to a short paragraph for complex strategy
+- Always reference the player's actual current situation when relevant
+- If the player is in combat, prioritize tactical advice
+- If the player is crafting, focus on the current recipe and technique recommendations
+- If idle, suggest productive next steps based on their realm and resources
+- Never fabricate game information -- if unsure, acknowledge uncertainty
+- Never mention system internals, APIs, or mod implementation details
+- Use the game state provided to give contextually relevant advice`;
+
+function getPersonaBlock(persona: string, customPrompt: string): string {
+  if (persona === 'Calculator') return CALCULATOR_PERSONA;
   if (persona === 'Custom') {
-    return customPrompt || 'You are a custom AI assistant.';
+    const base = customPrompt || 'You are a custom AI assistant for a Xianxia cultivation game.';
+    return `${base}\n\nYou have access to live game state data. Use it to provide contextually relevant advice. ${RESPONSE_GUIDELINES}`;
   }
-
-  return 'You are an ancient, lore-accurate Xianxia cultivation elder named "Spirit Ring". You reside inside a magical ring worn by the player character. Speak in profound idioms, reference the Dao, karma, and qi, and stay concise.';
+  return ELDER_PERSONA;
 }
 
-export function getSystemPrompt(persona: string, customPrompt: string, context: GameContext): string {
-  return `${getPersonaDescription(persona, customPrompt)}\n\n--- CURRENT GAME STATE ---\n${JSON.stringify(context, null, 2)}`;
+function formatGameState(context: GameContext): string {
+  const lines: string[] = ['=== CURRENT SITUATION ==='];
+
+  const realm = context.player.realm
+    ? `${context.player.realm}${context.player.realmProgress ? ` - ${context.player.realmProgress}` : ''}`
+    : 'Unknown';
+  lines.push(`Player: ${context.player.name} (${realm})`);
+
+  const cal = context.calendar;
+  const calStr = cal.year !== null ? `Year ${cal.year}, Month ${cal.month}, Day ${cal.day}` : 'Unknown';
+  lines.push(`Location: ${context.location} | Calendar: ${calStr}`);
+  lines.push(`Status: ${context.status}${context.autoBattle ? ' (Auto-Battle)' : ''}`);
+
+  const stats: string[] = [];
+  if (context.player.hp !== null) stats.push(`HP: ${context.player.hp}`);
+  if (context.player.qi !== null) stats.push(`Qi: ${context.player.qi}`);
+  if (context.player.money !== null) stats.push(`Money: ${context.player.money}`);
+  if (context.player.favour !== null) stats.push(`Favour: ${context.player.favour}`);
+  if (stats.length > 0) lines.push(stats.join(' | '));
+
+  const extras: string[] = [];
+  if (context.player.injured) extras.push('INJURED');
+  if (context.player.partySize > 0) extras.push(`Party: ${context.player.partySize} members`);
+  if (extras.length > 0) lines.push(extras.join(' | '));
+
+  if (context.combat) {
+    lines.push('');
+    lines.push('=== COMBAT ===');
+    lines.push(`Enemies: ${context.combat.enemyNames.join(', ') || 'Unknown'} (${context.combat.enemyCount} total)`);
+    const hpStr = context.combat.playerHp !== null && context.combat.playerMaxHp !== null
+      ? `Player HP: ${context.combat.playerHp}/${context.combat.playerMaxHp}`
+      : '';
+    if (hpStr) lines.push(`${hpStr}${context.combat.isSpar ? ' | Spar (non-lethal)' : ''}`);
+  }
+
+  if (context.crafting) {
+    lines.push('');
+    lines.push('=== CRAFTING ===');
+    if (context.crafting.recipe) lines.push(`Recipe: ${context.crafting.recipe}`);
+    const craftStats: string[] = [];
+    if (context.crafting.completion !== null) craftStats.push(`Completion: ${context.crafting.completion}`);
+    if (context.crafting.perfection !== null) craftStats.push(`Perfection: ${context.crafting.perfection}`);
+    if (context.crafting.stability !== null) craftStats.push(`Stability: ${context.crafting.stability}`);
+    if (context.crafting.harmony !== null) craftStats.push(`Harmony: ${context.crafting.harmony}`);
+    if (craftStats.length > 0) lines.push(craftStats.join(' | '));
+    if (context.crafting.condition) lines.push(`Condition: ${context.crafting.condition}`);
+    if (context.crafting.step !== null) lines.push(`Step: ${context.crafting.step} | Pills consumed: ${context.crafting.consumedPills}`);
+    if (context.crafting.recommendedTechniqueTypes.length > 0) {
+      lines.push(`Recommended techniques: ${context.crafting.recommendedTechniqueTypes.join(', ')}`);
+    }
+    if (context.crafting.companion) lines.push(`Crafting companion: ${context.crafting.companion}`);
+  }
+
+  if (context.recentEvents.length > 0) {
+    lines.push('');
+    lines.push('=== RECENT EVENTS ===');
+    for (const event of context.recentEvents) {
+      const dateTag = `[Y${event.year}/M${event.month}/D${event.day}]`;
+      const summary = event.texts.slice(0, 2).join(' ').slice(0, 120);
+      lines.push(`${dateTag} ${summary}${event.texts.join(' ').length > 120 ? '...' : ''}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+export function getSystemPrompt(persona: string, customPrompt: string, context: GameContext, knowledgeBlock?: string): string {
+  const personaBlock = getPersonaBlock(persona, customPrompt);
+  const gameState = formatGameState(context);
+  const guidelines = persona === 'Custom' ? '' : RESPONSE_GUIDELINES;
+
+  const parts = [personaBlock];
+  if (knowledgeBlock) parts.push(knowledgeBlock);
+  parts.push(gameState);
+  if (guidelines) parts.push(guidelines);
+
+  return parts.join('\n\n');
 }

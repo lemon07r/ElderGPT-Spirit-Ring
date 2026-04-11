@@ -1,5 +1,6 @@
 import type { CombatEntity, CraftingResult, EnemyEntity, Item } from 'afnm-types';
 import { AIClient } from '../ai/client';
+import { selectKnowledge } from '../ai/knowledge';
 import { readSettingsSnapshot } from '../config/settings';
 import { appendAssistantMessage } from '../ui/chatSession';
 import { extractContext, getSystemPrompt } from './contextEngine';
@@ -109,17 +110,19 @@ async function processQueue() {
 
       const settings = readSettingsSnapshot();
       const context = extractContext(readGameStateSnapshot());
+      const knowledgeBlock = selectKnowledge(context, 2000);
       const client = new AIClient({
         url: settings.apiUrl,
         apiKey: settings.apiKey,
         modelId: settings.modelId,
         provider: settings.provider,
         timeoutMs: settings.requestTimeoutSeconds * 1000,
+        maxOutputTokens: settings.outputLimitTokens ?? undefined,
       });
       const response = await client.chat([
         {
           role: 'system',
-          content: getSystemPrompt(settings.persona, settings.customPrompt, context),
+          content: getSystemPrompt(settings.persona, settings.customPrompt, context, knowledgeBlock),
         },
         {
           role: 'user',

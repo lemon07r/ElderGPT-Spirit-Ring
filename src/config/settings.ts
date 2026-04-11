@@ -15,6 +15,8 @@ export interface ChatSettings {
   fontSize: FontSize;
   panelSize: PanelSize;
   showStreaming: boolean;
+  contextLimitTokens: number | null;
+  outputLimitTokens: number | null;
 }
 
 export const SETTINGS_STORAGE_KEY = 'eldergpt_settings';
@@ -43,6 +45,8 @@ export const DEFAULT_SETTINGS: ChatSettings = {
   fontSize: 'medium',
   panelSize: 'default',
   showStreaming: true,
+  contextLimitTokens: null,
+  outputLimitTokens: null,
 };
 
 const MOD_TAG = '[ElderGPT]';
@@ -75,6 +79,12 @@ function normalizePanelSize(value: unknown): PanelSize {
   return value === 'compact' || value === 'large' ? value : 'default';
 }
 
+function normalizeNullablePositiveInt(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
+  return Math.round(value);
+}
+
 function normalizeSettings(value: unknown): ChatSettings {
   if (!isRecord(value)) {
     return DEFAULT_SETTINGS;
@@ -95,6 +105,8 @@ function normalizeSettings(value: unknown): ChatSettings {
     fontSize: normalizeFontSize(value.fontSize),
     panelSize: normalizePanelSize(value.panelSize),
     showStreaming: typeof value.showStreaming === 'boolean' ? value.showStreaming : DEFAULT_SETTINGS.showStreaming,
+    contextLimitTokens: normalizeNullablePositiveInt(value.contextLimitTokens),
+    outputLimitTokens: normalizeNullablePositiveInt(value.outputLimitTokens),
   };
 }
 

@@ -1,5 +1,9 @@
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { AIClient, Message } from '../../ai/client';
+import { needsCompaction, compactConversation } from '../../ai/compaction';
+import { selectKnowledge } from '../../ai/knowledge';
+import { detectModelLimits, getStaticModelLimits } from '../../ai/modelLimits';
+import { estimateTokens } from '../../ai/tokenEstimator';
 import {
   FONT_SIZES,
   PANEL_DIMENSIONS,
@@ -15,12 +19,16 @@ import {
   appendAssistantMessage,
   appendUserMessage,
   readChatSessionSnapshot,
+  replaceMessages,
   setChatLoading,
+  startNewChat,
+  switchToSession,
   startStreamingMessage,
   appendStreamChunk,
   finalizeStreamingMessage,
   subscribeToChatSession,
 } from '../chatSession';
+import { listSessions, deleteSession } from '../sessionManager';
 import { useDraggable } from '../../utils/useDraggable';
 import { getClosestCorner, Corner } from '../../utils/dragUtils';
 import { isTextEntryElement, pasteClipboardIntoElement } from '../inputShortcuts';
@@ -35,6 +43,8 @@ interface Props {
 }
 
 const PANEL_MARGIN = 20;
+const KNOWLEDGE_TOKEN_BUDGET_RATIO = 0.30;
+const OUTPUT_RESERVE_TOKENS = 2048;
 
 function cornerToPosition(c: Corner, width: number, height: number): { x: number; y: number } {
   switch (c) {
@@ -44,6 +54,26 @@ function cornerToPosition(c: Corner, width: number, height: number): { x: number
     case 'bottom-left': return { x: PANEL_MARGIN, y: window.innerHeight - height - PANEL_MARGIN };
   }
 }
+
+type ConnectionStatus = 'live' | 'partial' | 'offline';
+
+function getConnectionStatus(source: string): ConnectionStatus {
+  if (source === 'modapi-snapshot') return 'live';
+  if (source === 'redux-store') return 'partial';
+  return 'offline';
+}
+
+const STATUS_COLORS: Record<ConnectionStatus, string> = {
+  live: '#4ade80',
+  partial: '#facc15',
+  offline: '#f87171',
+};
+
+const STATUS_LABELS: Record<ConnectionStatus, string> = {
+  live: 'Live',
+  partial: 'Partial',
+  offline: 'Offline',
+};
 
 export function ChatPanel({ corner, setCorner, onClose }: Props) {
   const dragRef = useRef<HTMLDivElement>(null);
@@ -61,6 +91,7 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
   const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, dragPos, isDragging } = useDraggable(setCorner, dragRef, handleDragEnd);
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showSessions, setShowSessions] = useState(false);
   const [input, setInput] = useState('');
   const settings = useSyncExternalStore(subscribeToSettings, readSettingsSnapshot, readSettingsSnapshot);
   const chatState = useSyncExternalStore(
@@ -74,7 +105,7 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
     readGameStateSnapshot,
   );
   const context = extractContext(snapshot);
-  const { messages, isLoading } = chatState;
+  const { messages, isLoading, sessionName } = chatState;
   const dim = PANEL_DIMENSIONS[settings.panelSize];
   const fontSize = FONT_SIZES[settings.fontSize];
 
@@ -116,31 +147,50 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
     if (!trimmedInput || isLoading) return;
 
     const userMessage: Message = { role: 'user', content: trimmedInput };
-    const history = [...readChatSessionSnapshot().messages, userMessage];
+    const currentMessages = [...readChatSessionSnapshot().messages, userMessage];
     appendUserMessage(trimmedInput);
     setInput('');
     setChatLoading(true);
 
-    const systemContent = getSystemPrompt(settings.persona, settings.customPrompt, context);
+    const contextWindow = settings.contextLimitTokens
+      ?? getStaticModelLimits(settings.modelId).contextWindow;
+    const outputReserve = settings.outputLimitTokens ?? OUTPUT_RESERVE_TOKENS;
+
+    const knowledgeBudget = Math.floor(contextWindow * KNOWLEDGE_TOKEN_BUDGET_RATIO);
+    const knowledgeBlock = selectKnowledge(context, knowledgeBudget);
+    const systemContent = getSystemPrompt(settings.persona, settings.customPrompt, context, knowledgeBlock);
+    const systemTokens = estimateTokens(systemContent);
+
     const client = new AIClient({
       url: settings.apiUrl,
       apiKey: settings.apiKey,
       modelId: settings.modelId,
       provider: settings.provider,
       timeoutMs: settings.requestTimeoutSeconds * 1000,
+      maxOutputTokens: settings.outputLimitTokens ?? undefined,
     });
+
+    let chatMessages = currentMessages;
+
+    if (needsCompaction(systemTokens, chatMessages, contextWindow, outputReserve)) {
+      const result = await compactConversation(chatMessages, client);
+      if (result.compacted) {
+        chatMessages = result.messages;
+        replaceMessages(result.messages);
+      }
+    }
 
     try {
       if (settings.showStreaming) {
         startStreamingMessage();
         const response = await client.chatStream(
-          [{ role: 'system', content: systemContent }, ...history],
+          [{ role: 'system', content: systemContent }, ...chatMessages],
           (chunk) => appendStreamChunk(chunk),
         );
         finalizeStreamingMessage(response);
       } else {
         const response = await client.chatStream(
-          [{ role: 'system', content: systemContent }, ...history],
+          [{ role: 'system', content: systemContent }, ...chatMessages],
           () => {},
         );
         appendAssistantMessage(response);
@@ -150,13 +200,10 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
     }
   };
 
+  const connectionStatus = getConnectionStatus(context.source);
   const contextLabel = `${context.status} · ${context.location}`;
-  const sourceLabel =
-    context.source === 'modapi-snapshot'
-      ? 'modAPI snapshot'
-      : context.source === 'redux-store'
-        ? 'Redux fallback'
-        : 'No live state';
+  const sessions = showSessions ? listSessions() : [];
+
   const stopEventPropagation = (event: React.SyntheticEvent) => {
     event.stopPropagation();
   };
@@ -205,6 +252,7 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
         cursor: isDragging ? 'grabbing' : 'default',
       }}
     >
+      {/* Header */}
       <div
         style={{
           padding: '10px 15px',
@@ -220,19 +268,51 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
         onPointerCancel={onPointerCancel}
         onPointerUp={onPointerUp}
       >
-        <div>
-          <strong style={{ color: '#C5A059' }}>Spirit Ring</strong>
-          <div style={{ color: '#b9b0a0', fontSize: '12px', marginTop: '4px' }}>
-            <div>{contextLabel}</div>
-            <div>{sourceLabel}</div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <strong style={{ color: '#C5A059' }}>Spirit Ring</strong>
+            <span
+              style={{
+                display: 'inline-block',
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                backgroundColor: STATUS_COLORS[connectionStatus],
+                boxShadow: `0 0 4px ${STATUS_COLORS[connectionStatus]}`,
+                flexShrink: 0,
+              }}
+              title={`Game data: ${STATUS_LABELS[connectionStatus]}`}
+            />
+          </div>
+          <div style={{ color: '#b9b0a0', fontSize: '11px', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {contextLabel}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+          <button
+            aria-label="Chat history"
+            type="button"
+            onClick={() => { setShowSessions(!showSessions); setShowSettings(false); }}
+            style={headerButtonStyle}
+            title="Chat history"
+          >
+            ☰
+          </button>
+          <button
+            aria-label="New chat"
+            type="button"
+            onClick={() => { startNewChat(); setShowSessions(false); }}
+            style={headerButtonStyle}
+            title="New chat"
+          >
+            +
+          </button>
           <button
             aria-label="Open settings"
             type="button"
-            onClick={() => setShowSettings(!showSettings)}
-            style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '16px' }}
+            onClick={() => { setShowSettings(!showSettings); setShowSessions(false); }}
+            style={headerButtonStyle}
+            title="Settings"
           >
             ⚙
           </button>
@@ -240,17 +320,94 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
             aria-label="Minimize Spirit Ring"
             type="button"
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '16px' }}
+            style={headerButtonStyle}
+            title="Minimize"
           >
             ✖
           </button>
         </div>
       </div>
 
+      {/* Session list panel */}
+      {showSessions && (
+        <div style={{
+          flex: 1,
+          padding: '10px',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ color: '#C5A059', fontWeight: 'bold', fontSize: '13px' }}>Chat History</span>
+            <button type="button" onClick={() => setShowSessions(false)} style={{ ...headerButtonStyle, fontSize: '12px' }}>Back</button>
+          </div>
+          {sessions.length === 0 && (
+            <div style={{ color: '#888', fontSize: '12px', textAlign: 'center', padding: '20px' }}>No saved chats</div>
+          )}
+          {sessions.map((s) => {
+            const isActive = s.id === chatState.sessionId;
+            return (
+              <div
+                key={s.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px',
+                  borderRadius: '6px',
+                  backgroundColor: isActive ? 'rgba(197, 160, 89, 0.15)' : 'rgba(0,0,0,0.2)',
+                  border: `1px solid ${isActive ? '#C5A059' : 'rgba(197, 160, 89, 0.1)'}`,
+                  cursor: isActive ? 'default' : 'pointer',
+                }}
+                onClick={() => { if (!isActive) { switchToSession(s.id); setShowSessions(false); } }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', color: isActive ? '#f3ddab' : '#ddd', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {s.name}
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>
+                    {new Date(s.updatedAt).toLocaleDateString()}
+                  </div>
+                </div>
+                {!isActive && (
+                  <button
+                    type="button"
+                    aria-label="Delete chat"
+                    onClick={(e) => { e.stopPropagation(); deleteSession(s.id); setShowSessions(false); setShowSessions(true); }}
+                    style={{ ...headerButtonStyle, fontSize: '11px', color: '#f87171' }}
+                    title="Delete"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {showSettings ? (
         <SettingsPanel onClose={() => setShowSettings(false)} settings={settings} setSettings={updateSettings} />
-      ) : (
+      ) : !showSessions ? (
         <>
+          {/* Session name indicator */}
+          {sessionName && sessionName !== 'New Chat' && (
+            <div style={{
+              padding: '4px 15px',
+              fontSize: '11px',
+              color: '#a69d8c',
+              borderBottom: '1px solid rgba(197, 160, 89, 0.1)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              backgroundColor: 'rgba(0,0,0,0.15)',
+            }}>
+              {sessionName}
+            </div>
+          )}
+
+          {/* Messages */}
           <div
             ref={messageListRef}
             aria-live="polite"
@@ -264,6 +421,13 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
             }}
           >
             {messages.map((msg, i) => {
+              if (msg.role === 'system') {
+                return (
+                  <div key={i} style={{ textAlign: 'center', color: '#888', fontSize: '11px', padding: '4px 0', fontStyle: 'italic' }}>
+                    [Conversation summarized]
+                  </div>
+                );
+              }
               if (msg.role === 'assistant' && msg.content === '') return null;
               return (
                 <div
@@ -305,6 +469,7 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
             {showLoading && <LoadingAnimation />}
           </div>
 
+          {/* Input */}
           <div
             style={{
               padding: '10px',
@@ -355,7 +520,17 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
             </button>
           </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 }
+
+const headerButtonStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  color: '#aaa',
+  cursor: 'pointer',
+  fontSize: '16px',
+  padding: '2px 4px',
+  lineHeight: 1,
+};

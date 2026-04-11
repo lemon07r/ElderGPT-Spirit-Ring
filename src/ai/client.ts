@@ -120,6 +120,7 @@ export interface AIClientOptions {
   modelId?: string;
   provider?: ApiProvider;
   timeoutMs?: number;
+  maxOutputTokens?: number;
 }
 
 export class AIClient {
@@ -128,6 +129,7 @@ export class AIClient {
   private readonly modelId: string;
   private readonly provider: ApiProvider;
   private readonly timeoutMs: number;
+  private readonly maxOutputTokens: number | undefined;
 
   constructor(options: AIClientOptions);
   constructor(url: string, apiKey: string, modelId?: string);
@@ -142,12 +144,14 @@ export class AIClient {
       this.url = normalizeChatUrl(urlOrOptions, this.provider);
       this.apiKey = (apiKey ?? '').trim();
       this.modelId = modelId?.trim() || DEFAULT_MODEL;
+      this.maxOutputTokens = undefined;
     } else {
       this.provider = urlOrOptions.provider ?? 'openai';
       this.timeoutMs = urlOrOptions.timeoutMs ?? DEFAULT_TIMEOUT_MS;
       this.url = normalizeChatUrl(urlOrOptions.url, this.provider);
       this.apiKey = urlOrOptions.apiKey.trim();
       this.modelId = urlOrOptions.modelId?.trim() || DEFAULT_MODEL;
+      this.maxOutputTokens = urlOrOptions.maxOutputTokens;
     }
   }
 
@@ -184,7 +188,7 @@ export class AIClient {
           role: m.role,
           content: m.content,
         })),
-        max_tokens: 4096,
+        max_tokens: this.maxOutputTokens ?? 4096,
         temperature: 0.7,
       };
 
@@ -199,6 +203,7 @@ export class AIClient {
       messages,
       temperature: 0.7,
     };
+    if (this.maxOutputTokens) body.max_tokens = this.maxOutputTokens;
     if (stream) body.stream = true;
     return JSON.stringify(body);
   }

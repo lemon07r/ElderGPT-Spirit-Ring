@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { ApiProvider, ChatSettings, FontSize, PanelSize, Persona } from '../../config/settings';
 import { FONT_SIZES, TIMEOUT_NOTCHES, nearestNotchIndex } from '../../config/settings';
+import { detectModelLimits, getStaticModelLimits } from '../../ai/modelLimits';
 import { isTextEntryElement, pasteClipboardIntoElement } from '../inputShortcuts';
 
 interface SettingsPanelProps {
@@ -10,6 +11,21 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelProps) {
+  const [detectedLimits, setDetectedLimits] = useState<{ contextWindow: number; maxOutput: number } | null>(null);
+  const [probing, setProbing] = useState(false);
+
+  useEffect(() => {
+    const staticLimits = getStaticModelLimits(settings.modelId);
+    setDetectedLimits(staticLimits);
+
+    let cancelled = false;
+    setProbing(true);
+    void detectModelLimits(settings.apiUrl, settings.modelId, settings.apiKey, settings.provider)
+      .then((limits) => { if (!cancelled) setDetectedLimits(limits); })
+      .finally(() => { if (!cancelled) setProbing(false); });
+    return () => { cancelled = true; };
+  }, [settings.apiUrl, settings.modelId, settings.apiKey, settings.provider]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
@@ -240,6 +256,47 @@ export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelP
               </button>
             );
           })}
+        </div>
+      </label>
+
+      <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <span>Context Window {probing ? '(detecting...)' : ''}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input
+            type="number"
+            min={1024}
+            step={1024}
+            value={settings.contextLimitTokens ?? ''}
+            placeholder={detectedLimits ? `Auto (${detectedLimits.contextWindow.toLocaleString()})` : 'Auto'}
+            onChange={(e) => {
+              const v = e.target.value.trim();
+              setSettings({ contextLimitTokens: v ? parseInt(v, 10) || null : null });
+            }}
+            style={{ ...inputStyle, flex: 1 }}
+          />
+          <span style={{ color: '#a69d8c', fontSize: '11px', whiteSpace: 'nowrap' }}>tokens</span>
+        </div>
+        <p style={{ margin: 0, color: '#a69d8c', fontSize: '11px', lineHeight: 1.3 }}>
+          Leave blank for auto-detection. Override if your model supports a different context size.
+        </p>
+      </label>
+
+      <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <span>Max Output</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input
+            type="number"
+            min={256}
+            step={256}
+            value={settings.outputLimitTokens ?? ''}
+            placeholder={detectedLimits ? `Auto (${detectedLimits.maxOutput.toLocaleString()})` : 'Auto'}
+            onChange={(e) => {
+              const v = e.target.value.trim();
+              setSettings({ outputLimitTokens: v ? parseInt(v, 10) || null : null });
+            }}
+            style={{ ...inputStyle, flex: 1 }}
+          />
+          <span style={{ color: '#a69d8c', fontSize: '11px', whiteSpace: 'nowrap' }}>tokens</span>
         </div>
       </label>
 
