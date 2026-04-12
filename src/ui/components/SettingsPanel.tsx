@@ -309,6 +309,14 @@ export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelP
       </p>
 
       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+        <input name="autoTitle" type="checkbox" checked={settings.autoTitle} onChange={handleChange} />
+        <span>Auto-generate chat titles</span>
+      </label>
+      <p style={{ margin: 0, color: '#a69d8c', fontSize: '12px', lineHeight: 1.4 }}>
+        Uses your AI model to generate a short title after your first message.
+      </p>
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
         <input name="proactiveEnabled" type="checkbox" checked={settings.proactiveEnabled} onChange={handleChange} />
         <span>Enable proactive suggestions</span>
       </label>

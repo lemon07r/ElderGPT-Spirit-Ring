@@ -17,6 +17,7 @@ export interface ChatSettings {
   showStreaming: boolean;
   contextLimitTokens: number | null;
   outputLimitTokens: number | null;
+  autoTitle: boolean;
 }
 
 export const SETTINGS_STORAGE_KEY = 'eldergpt_settings';
@@ -47,6 +48,7 @@ export const DEFAULT_SETTINGS: ChatSettings = {
   showStreaming: true,
   contextLimitTokens: null,
   outputLimitTokens: null,
+  autoTitle: true,
 };
 
 const MOD_TAG = '[ElderGPT]';
@@ -107,6 +109,7 @@ function normalizeSettings(value: unknown): ChatSettings {
     showStreaming: typeof value.showStreaming === 'boolean' ? value.showStreaming : DEFAULT_SETTINGS.showStreaming,
     contextLimitTokens: normalizeNullablePositiveInt(value.contextLimitTokens),
     outputLimitTokens: normalizeNullablePositiveInt(value.outputLimitTokens),
+    autoTitle: typeof value.autoTitle === 'boolean' ? value.autoTitle : DEFAULT_SETTINGS.autoTitle,
   };
 }
 

@@ -198,6 +198,11 @@ export function switchToSession(id: string) {
   emit();
 }
 
+export function renameSession(name: string) {
+  updateState((previous) => ({ ...previous, sessionName: name }));
+  persistCurrentSession();
+}
+
 export function resetChatSession() {
   startNewChat();
 }

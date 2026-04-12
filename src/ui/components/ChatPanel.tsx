@@ -19,6 +19,7 @@ import {
   appendAssistantMessage,
   appendUserMessage,
   readChatSessionSnapshot,
+  renameSession,
   replaceMessages,
   setChatLoading,
   startNewChat,
@@ -142,6 +143,25 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
     return () => window.removeEventListener('keydown', handleTextShortcut, true);
   }, []);
 
+  const generateSessionTitle = async (client: AIClient) => {
+    const snap = readChatSessionSnapshot();
+    const convo = snap.messages
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .slice(0, 4)
+      .map((m) => `${m.role}: ${m.content.slice(0, 200)}`)
+      .join('\n');
+    try {
+      const title = await client.chat([
+        { role: 'system', content: 'Generate a concise chat title (max 6 words) for this conversation. Reply with ONLY the title, no quotes, no punctuation at the end, no explanation.' },
+        { role: 'user', content: convo },
+      ]);
+      const cleaned = title.trim().replace(/^["']|["']$/g, '').replace(/\.+$/, '').slice(0, 60);
+      if (cleaned && !cleaned.startsWith('[System:')) {
+        renameSession(cleaned);
+      }
+    } catch { /* title generation is best-effort */ }
+  };
+
   const handleSend = async () => {
     const trimmedInput = input.trim();
     if (!trimmedInput || isLoading) return;
@@ -180,6 +200,9 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
       }
     }
 
+    const needsTitle = settings.autoTitle
+      && readChatSessionSnapshot().sessionName === 'New Chat';
+
     try {
       if (settings.showStreaming) {
         startStreamingMessage();
@@ -194,6 +217,10 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
           () => {},
         );
         appendAssistantMessage(response);
+      }
+
+      if (needsTitle) {
+        generateSessionTitle(client).catch(() => {});
       }
     } finally {
       setChatLoading(false);
