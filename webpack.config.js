@@ -76,6 +76,7 @@ module.exports = {
         author: package.author,
         description: package.description,
       }),
+      MOD_VERSION: JSON.stringify(package.version),
     }),
   ],
 };

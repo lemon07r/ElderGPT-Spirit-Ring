@@ -10,6 +10,8 @@ interface SettingsPanelProps {
   setSettings: (update: Partial<ChatSettings> | ((previous: ChatSettings) => Partial<ChatSettings> | ChatSettings)) => void;
 }
 
+declare const MOD_VERSION: string;
+
 export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelProps) {
   const [detectedLimits, setDetectedLimits] = useState<{ contextWindow: number; maxOutput: number } | null>(null);
   const [probing, setProbing] = useState(false);
@@ -324,9 +326,14 @@ export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelP
         Uses official modAPI hooks for location, combat, crafting, and major time changes.
       </p>
 
-      <button type="button" onClick={onClose} style={{ marginTop: 'auto', padding: '8px', backgroundColor: '#C5A059', border: 'none', color: '#0F0F14', fontWeight: 'bold', cursor: 'pointer' }}>
-        Save & Back
-      </button>
+      <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <button type="button" onClick={onClose} style={{ padding: '8px', backgroundColor: '#C5A059', border: 'none', color: '#0F0F14', fontWeight: 'bold', cursor: 'pointer' }}>
+          Save & Back
+        </button>
+        <div style={{ textAlign: 'center', color: '#665e50', fontSize: '10px' }}>
+          Spirit Ring v{typeof MOD_VERSION !== 'undefined' ? MOD_VERSION : '?'}
+        </div>
+      </div>
     </div>
   );
 }

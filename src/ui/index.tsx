@@ -42,7 +42,7 @@ export function initUI() {
 
   document.body.appendChild(rootDiv);
 
-  const CAPTURED_EVENTS = [
+  const ISOLATED_EVENTS = [
     'mousedown', 'mouseup', 'click', 'dblclick', 'contextmenu',
     'pointerdown', 'pointerup',
     'keydown', 'keyup', 'keypress',
@@ -51,15 +51,10 @@ export function initUI() {
     'wheel',
   ] as const;
 
-  function isolateEvent(event: Event) {
-    const target = event.target as HTMLElement | null;
-    if (!target) return;
-    if (target === rootDiv) return;
-    event.stopPropagation();
-  }
-
-  for (const eventName of CAPTURED_EVENTS) {
-    rootDiv.addEventListener(eventName, isolateEvent, true);
+  for (const eventName of ISOLATED_EVENTS) {
+    rootDiv.addEventListener(eventName, (event: Event) => {
+      event.stopPropagation();
+    }, false);
   }
 
   try {
