@@ -235,6 +235,17 @@ Authoritative project docs live in `docs/project/`:
 
 If the advice feels wrong, confusing, or out of date, [leave a comment on the Workshop page](https://steamcommunity.com/sharedfiles/filedetails/?id=3701616500) with what was happening in-game and what the mod told you. That's the fastest way to improve it.
 
+## My Other Mods
+
+- [CraftBuddy](https://github.com/lemon07r/AFNM-CraftBuddy) — Live crafting optimizer overlay with AutoBuddy auto mode. ([Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3661729323))
+- [Lucky All Around](https://github.com/lemon07r/LuckyAllAround) — Configurable pity-event luck weighting for Explore events. ([Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3694065051))
+
+[View all my mods in my AFNM mod collection](https://steamcommunity.com/sharedfiles/filedetails/?id=3704747572)
+
+## Make Your Own Mod
+
+Want to build your own AFNM mod? Use the [AFNM Agent Mod Template](https://github.com/lemon07r/AfnmAgentModTemplate) — a ready-to-go scaffold with ModAPI reference docs, runtime validation scripts, Workshop packaging, and built-in support for AI coding agents.
+
 ## License
 
 MIT
