@@ -5,7 +5,7 @@ export interface ModelLimits {
   maxOutput: number;
 }
 
-export const DEFAULT_CONTEXT_WINDOW = 4096;
+export const DEFAULT_CONTEXT_WINDOW = 32768;
 export const DEFAULT_MAX_OUTPUT = 4096;
 const PROBE_TIMEOUT_MS = 5000;
 
@@ -44,6 +44,11 @@ const MODEL_TABLE: Record<string, ModelLimits> = {
   'mistral-large':  { contextWindow: 131072,  maxOutput: 8192 },
   'kimi-k2':        { contextWindow: 256000,  maxOutput: 8192 },
   'kimi-k2.5':      { contextWindow: 256000,  maxOutput: 8192 },
+  'glm-4':          { contextWindow: 131072,  maxOutput: 4096 },
+  'glm-4-plus':     { contextWindow: 131072,  maxOutput: 4096 },
+  'glm-5':          { contextWindow: 131072,  maxOutput: 8192 },
+  'glm-5.1':        { contextWindow: 131072,  maxOutput: 8192 },
+  'glm-z1':         { contextWindow: 131072,  maxOutput: 8192 },
 };
 
 function lookupStatic(modelId: string): ModelLimits {

@@ -66,30 +66,98 @@ function renderInline(text: string): React.ReactNode {
   return parts.length <= 1 ? (parts[0] ?? text) : <>{parts}</>;
 }
 
+interface TableData {
+  headers: string[];
+  rows: string[][];
+}
+
+function tryParseTable(lines: string[], startIndex: number): { table: TableData; consumed: number } | null {
+  if (startIndex + 1 >= lines.length) return null;
+  const headerLine = lines[startIndex].trim();
+  const sepLine = lines[startIndex + 1].trim();
+  if (!headerLine.includes('|') || !sepLine.includes('|')) return null;
+  if (!/^[\s|:-]+$/.test(sepLine)) return null;
+
+  const parseCells = (line: string): string[] =>
+    line.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+
+  const headers = parseCells(headerLine);
+  const sepCells = parseCells(sepLine);
+  if (sepCells.length !== headers.length) return null;
+  if (!sepCells.every((c) => /^:?-+:?$/.test(c))) return null;
+
+  const rows: string[][] = [];
+  let i = startIndex + 2;
+  while (i < lines.length) {
+    const row = lines[i].trim();
+    if (!row.includes('|')) break;
+    rows.push(parseCells(row));
+    i++;
+  }
+  if (rows.length === 0) return null;
+  return { table: { headers, rows }, consumed: i - startIndex };
+}
+
+function renderTable(table: TableData, key: number): React.ReactNode {
+  return (
+    <div key={key} style={{ overflowX: 'auto', margin: '6px 0' }}>
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            {table.headers.map((h, i) => (
+              <th key={i} style={thStyle}>{renderInline(h)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row, ri) => (
+            <tr key={ri}>
+              {row.map((cell, ci) => (
+                <td key={ci} style={tdStyle}>{renderInline(cell)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function renderTextBlock(text: string, blockKey: number): React.ReactNode {
   const lines = text.split('\n');
   const elements: React.ReactNode[] = [];
   let listItems: string[] = [];
   let listType: 'ul' | 'ol' | null = null;
+  let i = 0;
 
   const flushList = () => {
     if (listItems.length === 0) return;
     const Tag = listType === 'ol' ? 'ol' : 'ul';
     elements.push(
       <Tag key={elements.length} style={listStyle}>
-        {listItems.map((item, i) => <li key={i}>{renderInline(item)}</li>)}
+        {listItems.map((item, j) => <li key={j}>{renderInline(item)}</li>)}
       </Tag>,
     );
     listItems = [];
     listType = null;
   };
 
-  for (const line of lines) {
-    const trimmed = line.trim();
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
+
+    // Try table parse
+    const tableResult = tryParseTable(lines, i);
+    if (tableResult) {
+      flushList();
+      elements.push(renderTable(tableResult.table, elements.length));
+      i += tableResult.consumed;
+      continue;
+    }
 
     if (/^-{3,}$/.test(trimmed) || /^\*{3,}$/.test(trimmed)) {
       flushList();
       elements.push(<hr key={elements.length} style={hrStyle} />);
+      i++;
       continue;
     }
 
@@ -102,6 +170,7 @@ function renderTextBlock(text: string, blockKey: number): React.ReactNode {
           {renderInline(headerMatch[2])}
         </div>,
       );
+      i++;
       continue;
     }
 
@@ -110,6 +179,7 @@ function renderTextBlock(text: string, blockKey: number): React.ReactNode {
       if (listType === 'ol') flushList();
       listType = 'ul';
       listItems.push(ulMatch[1]);
+      i++;
       continue;
     }
 
@@ -118,6 +188,7 @@ function renderTextBlock(text: string, blockKey: number): React.ReactNode {
       if (listType === 'ul') flushList();
       listType = 'ol';
       listItems.push(olMatch[1]);
+      i++;
       continue;
     }
 
@@ -125,10 +196,12 @@ function renderTextBlock(text: string, blockKey: number): React.ReactNode {
 
     if (!trimmed) {
       if (elements.length > 0) elements.push(<div key={elements.length} style={{ height: '6px' }} />);
+      i++;
       continue;
     }
 
     elements.push(<div key={elements.length} style={{ margin: '2px 0' }}>{renderInline(trimmed)}</div>);
+    i++;
   }
 
   flushList();
@@ -193,4 +266,26 @@ const hrStyle: React.CSSProperties = {
   border: 'none',
   borderTop: '1px solid rgba(197, 160, 89, 0.3)',
   margin: '8px 0',
+};
+
+const tableStyle: React.CSSProperties = {
+  borderCollapse: 'collapse',
+  width: '100%',
+  fontSize: '0.9em',
+  margin: '4px 0',
+};
+
+const thStyle: React.CSSProperties = {
+  borderBottom: '2px solid rgba(197, 160, 89, 0.4)',
+  padding: '4px 8px',
+  textAlign: 'left',
+  color: '#e8d5a8',
+  fontWeight: 'bold',
+  whiteSpace: 'nowrap',
+};
+
+const tdStyle: React.CSSProperties = {
+  borderBottom: '1px solid rgba(197, 160, 89, 0.15)',
+  padding: '3px 8px',
+  whiteSpace: 'nowrap',
 };

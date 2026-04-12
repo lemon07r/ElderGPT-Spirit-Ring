@@ -3,7 +3,7 @@ title: Mod Architecture
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-11
+last_verified: 2026-04-12
 source_of_truth: src/integration, src/ui, src/ai, src/config, live AFNM 0.6.50 runtime
 review_cycle_days: 30
 related_files: src/integration/index.ts,src/integration/gameState.ts,src/integration/contextEngine.ts,src/integration/proactive.ts,src/ui/chatSession.ts,src/ui/sessionManager.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ai/client.ts,src/ai/knowledge/index.ts,src/ai/compaction.ts,src/ai/modelLimits.ts
@@ -21,13 +21,13 @@ The current architecture has seven parts:
    This is the single bridge into live game state. It prefers `window.modAPI.getGameStateSnapshot()` and `window.modAPI.subscribe()`, then falls back to `window.gameStore` only if the official API is unavailable.
 
 2. `src/integration/contextEngine.ts`
-   This normalizes the raw snapshot into a compact `GameContext` object and builds the system prompt. System prompts include expanded persona instructions, dynamic knowledge injection, human-readable formatted game state, and response guidelines. Game-shape knowledge belongs here, not spread across UI components.
+   This normalizes the raw snapshot into a `GameContext` object and builds the system prompt. The context engine extracts comprehensive game data including equipped item stats (via `modAPI.gameData.items` lookup), player physical/social stats, full combat stats during combat, inventory, techniques, quests, NPC relationships, and guild status. Game state is formatted with status-aware tiering so only relevant sections are included (e.g., stances during combat, crafting actions during crafting, NPCs during idle). The system prompt is assembled as a single consolidated block with no duplicated instructions.
 
 3. `src/ai/knowledge/`
-   Dynamic game knowledge system. Maintains compiled knowledge blocks for crafting, combat, and cultivation that are injected into prompts based on current game state. The selector function respects a token budget to avoid crowding out conversation history.
+   Dynamic game knowledge system. Maintains compiled knowledge blocks for crafting, combat, cultivation, and stat formulas that are injected into prompts based on current game state. The selector uses budget-based `tryAdd()` to prioritize status-relevant knowledge first, then complementary blocks if budget allows.
 
 4. `src/ai/client.ts`, `src/ai/modelLimits.ts`, `src/ai/compaction.ts`
-   Multi-provider chat client supporting OpenAI-compatible and Anthropic endpoints with streaming. Model limit detection probes provider-specific APIs (Anthropic, LM Studio, Ollama) with a static fallback table. Conversation compaction uses anchored iterative summarization to keep long conversations within context limits.
+   Multi-provider chat client supporting OpenAI-compatible and Anthropic endpoints with streaming. Model limit detection probes provider-specific APIs (Anthropic, LM Studio, Ollama) with a static fallback table covering GPT, Claude, Llama, Qwen, Gemma, DeepSeek, Mistral, Kimi, and GLM model families. Default context window is 32K for unknown models. Conversation compaction uses anchored iterative summarization to keep long conversations within context limits.
 
 5. `src/ui/*`
    The main chat UI is a persistent body-mounted overlay. We also use `window.modAPI.injectUI()` for targeted in-game entry points. The chat panel includes session management (history, switching, new chat), connection status indicator, markdown rendering, and streaming display.
@@ -58,7 +58,8 @@ The repo currently adopts the new API in four places:
 - The chat header reacts to live state through the official subscription path.
 - A `combat-victory` inline CTA is injected through `injectUI()` to open the chat from a real game dialog.
 - Proactive suggestions now use official lifecycle hooks for location entry, month rollover, long day advances, combat completion, crafting completion, loot drops, and pre-combat advice.
-- Context extraction now includes `persistentEventLog` entries and `craftingTeamUpOverride` companion name for richer AI prompts.
+- Context extraction now includes `persistentEventLog` entries, `craftingTeamUpOverride` companion name, full equipment stats via item database lookup, player physical/social/affinity stats, combat entity stats, inventory, techniques, stances, quests, NPC relationships, and guild status.
+- The overlay root div uses native capture-phase event listeners to isolate all input events from game panels, preventing click/focus interception when game UI (inventory, etc.) is open behind ElderGPT.
 
 ## Deliberate Non-Adoption
 

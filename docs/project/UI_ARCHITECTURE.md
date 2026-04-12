@@ -3,7 +3,7 @@ title: UI Architecture
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-11
+last_verified: 2026-04-12
 source_of_truth: src/ui + src/ui/chatSession.ts + src/ui/sessionManager.ts + src/config/settings.ts + src/integration/uiBridge.tsx
 review_cycle_days: 30
 related_files: src/ui/index.tsx,src/ui/ElderGPTApp.tsx,src/ui/chatSession.ts,src/ui/sessionManager.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ui/components/SettingsPanel.tsx,src/ui/components/SpiritRingToggle.tsx,src/integration/uiBridge.tsx
@@ -20,6 +20,7 @@ This remains intentional for now:
 - The mod needs one affordance that survives location, crafting, and event transitions.
 - A body-mounted root is simpler than registering and maintaining `injectUI()` slots for every screen/dialog where the chat should remain reachable.
 - The overlay should prefer the installed runtime's `window.React` and `window.ReactDOM` surface directly.
+- The root div registers native capture-phase event listeners for mouse, pointer, keyboard, input, focus, and wheel events to prevent game panels from intercepting ElderGPT interactions.
 
 Installed-runtime note:
 
@@ -57,7 +58,7 @@ Current usage:
   Settings editor with: API provider selector, notched timeout slider, persona buttons (Elder/Calculator/Custom), text/window size controls, streaming toggle, proactive hints toggle. New: context window and max output token settings with auto-detection display from `modelLimits.ts`.
 
 - `MarkdownText`
-  Renders assistant messages with code blocks, inline code, bold, italic, lists, headers, and horizontal rules.
+  Renders assistant messages with code blocks, inline code, bold, italic, lists, headers, horizontal rules, and markdown tables (pipe-delimited with separator rows).
 
 - `LoadingAnimation`
   Animated yin-yang glyph with floating text and pulsing dots while waiting for AI response.

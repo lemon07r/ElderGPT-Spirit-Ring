@@ -3,7 +3,7 @@ title: AI Client
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-11
+last_verified: 2026-04-12
 source_of_truth: src/ai/client.ts + src/ai/modelLimits.ts + src/ai/compaction.ts + src/ai/tokenEstimator.ts
 review_cycle_days: 30
 related_files: src/ai/client.ts,src/ai/modelLimits.ts,src/ai/compaction.ts,src/ai/tokenEstimator.ts,src/ui/components/ChatPanel.tsx,src/integration/contextEngine.ts,src/config/settings.ts
@@ -46,8 +46,8 @@ Both providers support SSE streaming via `chatStream()`. The method accepts a `S
 Three-tier detection strategy:
 
 1. **Dynamic API probing** -- runs on settings change. Anthropic via `GET /v1/models` (returns `max_input_tokens`, `max_tokens`). LM Studio via `GET /api/v0/models` (returns `max_context_length`). Ollama via `POST /api/show` (returns `{arch}.context_length`).
-2. **Static fallback table** -- keyed by model ID with prefix matching. Covers GPT-4o/4.1/5.4, Claude 3/3.5/4, Llama 3.x, Qwen 2.5/3, Gemma 2/3, DeepSeek, Mistral, Kimi.
-3. **Safe defaults** -- `contextWindow: 4096`, `maxOutput: 4096`.
+2. **Static fallback table** -- keyed by model ID with prefix matching. Covers GPT-4o/4.1/5.4, Claude 3/3.5/4, Llama 3.x, Qwen 2.5/3/3.5, Gemma 2/3, DeepSeek, Mistral, Kimi, GLM 4/5/5.1/z1.
+3. **Safe defaults** -- `contextWindow: 32768`, `maxOutput: 4096`.
 
 User settings overrides (`contextLimitTokens`, `outputLimitTokens`) always take precedence over detected values.
 
@@ -77,16 +77,24 @@ The caller is responsible for building:
 The current system prompt format is:
 
 ```text
-<expanded persona instructions>
+<compact persona instructions>
 
-<game overview + state-conditional knowledge blocks>
+RULES:
+<unified access boundaries, fabrication rules, response guidelines>
 
-=== CURRENT SITUATION ===
+<game overview + status-driven knowledge blocks + stat formulas>
+
+=== GAME STATE ===
 Player: Name (Realm - Progress)
-Location: ... | Calendar: Year X, Month Y, Day Z
-...
-
-<response guidelines>
+Location: ... | Y2/M4/D18
+Status: Idle
+HP:120 | Qi:55 | Money:340
+Body: flesh=12, muscles=11, ...
+=== EQUIPMENT ===
+[Clothing] Spirit Bound Garb | qitouched | bodyForging
+  defense=3500, dr=25, ...
+  buffs: ...
+=== INVENTORY === Iron Pill x3, Spirit Core x5, ...
 ```
 
 ## What Stays Out Of This Layer

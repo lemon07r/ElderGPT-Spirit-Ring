@@ -3,89 +3,101 @@ title: Context Engine
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-11
+last_verified: 2026-04-12
 source_of_truth: src/integration/contextEngine.ts + src/integration/gameState.ts + src/ai/knowledge/
 review_cycle_days: 30
-related_files: src/integration/contextEngine.ts,src/integration/gameState.ts,src/ai/knowledge/index.ts,src/ui/components/ChatPanel.tsx
+related_files: src/integration/contextEngine.ts,src/integration/gameState.ts,src/ai/knowledge/index.ts,src/ai/knowledge/statFormulas.ts,src/ui/components/ChatPanel.tsx
 ---
 
 # Context Engine
 
-The context engine turns a live AFNM snapshot into a compact prompt payload. It is intentionally narrow: read the state, normalize it, and return a stable object that the AI client and UI can consume.
+The context engine turns a live AFNM snapshot into a compact, tiered prompt payload. It reads game state, normalizes it, and returns a stable `GameContext` object that the AI client and UI consume.
 
 ## Input Order
 
-`extractContext()` should receive data in this order:
+`extractContext()` receives data in this order:
 
 1. A provided `RootState` snapshot.
 2. `readGameStateSnapshot()` from `src/integration/gameState.ts`.
 3. A stable fallback object if no live state is available.
 
-This keeps the normalization logic testable while still supporting live runtime access.
-
 ## What We Normalize
 
-The current normalized payload includes:
+The `GameContext` payload includes:
 
-- `source`
-  `modapi-snapshot`, `redux-store`, or `unavailable`.
+- **Core identity** (always present): source, status, screen, location, player name/realm/progress, HP, Qi, droplets, money, favour, injury, party size, calendar, physical stats, social stats, elemental affinities, reputation.
 
-- `status`
-  `InCombat`, `Crafting`, `Event`, or `Idle`.
+- **Equipment** (always present): each equipped item (clothing, talismans, artefacts, mount, cauldron, flame) is cross-referenced against `modAPI.gameData.items` to resolve full stats (defense, dr, power, buffs, etc.), enchantment, quality tier, rarity, and realm.
 
-- `screen` and `location`
-  The current screen key plus a human-readable location name when it can be resolved from `modAPI.gameData.locations`.
+- **Combat** (when in combat): enemy names/count, player HP/maxHP, full `CombatStatsMap` (power, defense, dr, barrier, critchance, school boosts/resistances, etc.), spar state.
 
-- `player`
-  Name, realm, realm progress, HP, Qi, money, favour, injury state, and party size.
+- **Crafting** (when crafting): recipe name, completion/perfection/stability/harmony, condition, step, consumed pills, recommended techniques, companion, full crafting stats (pool, control, intensity, etc.).
 
-- `calendar`
-  Year, month, and day.
+- **Inventory**: item names and stack counts (up to 50 items).
 
-- `flagCount`
-  A cheap signal for prompt context without serializing the full flag map by default.
+- **Techniques**: known combat technique names.
 
-- `combat`
-  Enemy names/count, player HP, max HP, and spar state.
+- **Crafting actions**: known crafting technique names.
 
-- `crafting`
-  Recipe name, progress numbers, condition, harmony, step number, consumed pills, recommended technique types, and companion name (from `craftingTeamUpOverride`).
+- **Stances**: stance names with technique sequences.
 
-- `recentEvents`
-  The most recent 5 entries from `persistentEventLog`, each with year/month/day and text history for richer AI context.
+- **Quests**: active quest names with step progress.
+
+- **NPCs**: character names, approval, relationship tier, following state (only NPCs with non-zero approval or who are following).
+
+- **Guild**: selected guild name, rank, approval.
+
+- **Recent events**: last 5 `persistentEventLog` entries with date and text.
 
 ## System Prompt Structure
 
-`getSystemPrompt()` builds a multi-section prompt:
+`getSystemPrompt()` builds a consolidated prompt with no duplicated instructions:
 
-1. **Persona block** -- expanded character instructions with personality traits, advisory behaviors, and response constraints. Three built-in personas (Elder, Calculator, Custom) with significantly more guidance than a simple role description.
+1. **Persona block** -- compact personality and style instructions. Three built-in personas (Elder, Calculator, Custom).
 
-2. **Knowledge block** -- dynamic game knowledge injected based on current game state via `src/ai/knowledge/`. When crafting, the crafting knowledge block is included. When in combat, the combat knowledge block. A game overview is always included. Knowledge injection respects a token budget (30% of context window) to avoid crowding out conversation history.
+2. **Rules block** -- single unified block covering data access boundaries, fabrication rules, and response guidelines. Replaces the old separate KNOWLEDGE_BOUNDARIES + RESPONSE_GUIDELINES blocks.
 
-3. **Formatted game state** -- human-readable annotated context (not raw JSON). Organized into labeled sections (CURRENT SITUATION, COMBAT, CRAFTING, RECENT EVENTS) with field explanations.
+3. **Knowledge block** -- status-driven game knowledge injected via `src/ai/knowledge/`. See below.
 
-4. **Response guidelines** -- explicit rules for response length, what to reference, and when to be proactive vs reactive.
+4. **Tiered game state** -- formatted context organized by relevance to current activity.
+
+## Tiered Game State Formatting
+
+The game state is formatted with status-aware section inclusion to avoid filling context with irrelevant data:
+
+| Section | InCombat | Crafting | Idle/Event |
+|---------|----------|----------|------------|
+| Core identity & vitals | Always | Always | Always |
+| Physical/social stats | Always | Always | Always |
+| Equipment | Always | Always | Always |
+| Combat stats | Yes | No | No |
+| Crafting stats | No | Yes | No |
+| Techniques | Yes | No | Yes |
+| Stances | Yes | No | No |
+| Crafting actions | No | Yes | No |
+| Inventory | Always | Always | Always |
+| Quests | No | No | Yes |
+| NPCs | No | No | Yes |
+| Reputation & Guild | Always | Always | Always |
+| Recent events | Always | Always | Always |
 
 ## Dynamic Knowledge System
 
 Knowledge files live in `src/ai/knowledge/`:
 
-- `gameOverview.ts` -- always included. Concise overview of AFNM, core game loop, key concepts.
-- `craftingKnowledge.ts` -- injected when `status === 'Crafting'`. Covers technique types, core stats, harmony minigames, synergies, consumable economy, difficulty scaling.
-- `combatKnowledge.ts` -- injected when `status === 'InCombat'`. Covers cultivation schools, damage types, mastery, tactical advice principles.
-- `cultivationKnowledge.ts` -- injected when idle or during events. Covers 10 realms, progression strategy, general guidance.
+- `gameOverview.ts` -- always included. AFNM overview, core loop, key concepts.
+- `statFormulas.ts` -- game constants and stat scaling formulas from source code. Included alongside the primary status-driven block (combat formulas with combat, crafting formulas with crafting).
+- `combatKnowledge.ts` -- primary when `status === 'InCombat'`. Schools, damage types, tactical principles.
+- `craftingKnowledge.ts` -- primary when `status === 'Crafting'`. Techniques, harmony minigames, synergies.
+- `cultivationKnowledge.ts` -- primary when idle/event. Realms, progression, strategy.
 
-The `selectKnowledge()` function in `src/ai/knowledge/index.ts` examines `GameContext.status` and injects appropriate blocks within a token budget.
+The `selectKnowledge()` function uses a budget-based `tryAdd()` approach: primary knowledge first, then stat formulas, then complementary blocks if budget allows. This prevents knowledge from crowding out conversation history.
 
 ## Design Constraints
 
-- Keep the payload compact enough for repeated chat calls.
+- Keep the payload compact; tiered formatting avoids dumping irrelevant sections.
 - Use human-readable formatted context, not raw JSON dumps.
-- Keep all game-shape assumptions in `contextEngine.ts` so future AFNM patches only require one integration pass.
-- Knowledge blocks should be LLM-optimized plain text, not markdown or JSON.
+- Keep all game-shape assumptions in `contextEngine.ts`.
+- Equipment stats are resolved via `modAPI.gameData.items` lookup at extraction time.
 - Token budgets prevent knowledge injection from crowding out conversation history.
-- Treat the data as immutable even when the API offers mutation hooks elsewhere.
-
-## Current Limitation
-
-Auto-battle state is not yet modeled in the typed snapshot surface. The context engine exposes `autoBattle` as `boolean | null`; callers should treat `null` as "unknown", not "off".
+- System prompt is assembled in one place with no duplicated instructions across blocks.

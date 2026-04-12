@@ -42,6 +42,26 @@ export function initUI() {
 
   document.body.appendChild(rootDiv);
 
+  const CAPTURED_EVENTS = [
+    'mousedown', 'mouseup', 'click', 'dblclick', 'contextmenu',
+    'pointerdown', 'pointerup',
+    'keydown', 'keyup', 'keypress',
+    'input', 'change',
+    'focusin', 'focusout',
+    'wheel',
+  ] as const;
+
+  function isolateEvent(event: Event) {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+    if (target === rootDiv) return;
+    event.stopPropagation();
+  }
+
+  for (const eventName of CAPTURED_EVENTS) {
+    rootDiv.addEventListener(eventName, isolateEvent, true);
+  }
+
   try {
     const ReactRuntime = window.React || React;
     // AFNM exposes the renderer on the page already. Using that surface directly
