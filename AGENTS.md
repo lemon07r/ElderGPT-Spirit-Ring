@@ -12,6 +12,10 @@ Project skills live in `.agents/skills/` and should be loaded before long docs:
 - `spirit-ring-ai-client` for `src/ai/*`, providers, streaming, timeouts, model limits, compaction, and secrets handling.
 - `spirit-ring-ui` for `src/ui/*`, overlay behavior, settings, injected buttons, sessions, and harness validation.
 
+## Documentation And Skill Stewardship
+
+If you discover inaccurate, stale, duplicated, or misleading information in any doc or `.agents/skills/*` file while working, fix it in the same change. Agents have standing permission to edit, correct, prune, or improve docs and skills so future agents do not inherit known traps. Verify corrections against code, tests, package scripts, or the installed-runtime oracle; if something cannot be fully verified, make the uncertainty explicit instead of presenting it as fact.
+
 ## Project Structure
 
 - `src/mod.ts`: mod entry point and metadata.

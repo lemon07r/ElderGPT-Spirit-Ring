@@ -35,6 +35,10 @@ ElderGPT Spirit Ring is a read-only advisor. Runtime integration observes the ga
 - Resolve equipment through `modAPI.gameData.items` when available.
 - Keep system prompt rules consolidated; avoid duplicated instruction blocks.
 
+## Documentation And Skill Stewardship
+
+If runtime docs, this skill, or any project skill/doc is wrong, stale, duplicated, or unclear, correct it in the same pass. The read-only boundary and ModAPI priority order are safety-critical; do not leave outdated guidance for future agents.
+
 ## Validation
 
 ```bash
