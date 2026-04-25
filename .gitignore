@@ -10,13 +10,11 @@ builds/
 .env.*
 
 # ── AI agent / skill tooling ──────────────────────────────────
-.agents/
 .gemini/
 .junie/
 .factory/
 .firecrawl/
 .vera/
-AGENTS.md
 skills-lock.json
 
 # ── Editor & OS junk ─────────────────────────────────────────
@@ -27,6 +25,8 @@ skills-lock.json
 *~
 .DS_Store
 Thumbs.db
+
+settings.json
 
 # ── Temp / scratch ────────────────────────────────────────────
 tmp/
