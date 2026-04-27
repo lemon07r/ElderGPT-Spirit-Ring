@@ -275,21 +275,24 @@ export class AIClient {
     }
   }
 
+  private describeError(error: unknown): string {
+    const isErrorLike = error instanceof Error ||
+      (typeof error === 'object' && error !== null && 'message' in error);
+    const msg = isErrorLike ? String((error as { message: string }).message) : '';
+    const name = isErrorLike && 'name' in (error as object) ? String((error as { name: string }).name) : '';
+    const timedOut = name === 'AbortError' || msg.includes('aborted') || msg.includes('abort');
+    const timeoutSec = Math.trunc(this.timeoutMs / 1000);
+    return timedOut
+      ? `Request timed out after ${timeoutSec} seconds`
+      : msg || 'Unknown error';
+  }
+
   async chat(messages: Message[]): Promise<string> {
     try {
       return await this.fetchChat(messages);
     } catch (error) {
-      const isErrorLike = error instanceof Error ||
-        (typeof error === 'object' && error !== null && 'message' in error);
-      const msg = isErrorLike ? String((error as { message: string }).message) : '';
-      const name = isErrorLike && 'name' in (error as object) ? String((error as { name: string }).name) : '';
-      const timedOut = name === 'AbortError' || msg.includes('aborted') || msg.includes('abort');
-      const timeoutSec = Math.trunc(this.timeoutMs / 1000);
-      const message = timedOut
-        ? `Request timed out after ${timeoutSec} seconds`
-        : msg || 'Unknown error';
       console.error('[ElderGPT] AI error', error);
-      return this.formatError(message);
+      return this.formatError(this.describeError(error));
     }
   }
 
@@ -391,17 +394,8 @@ export class AIClient {
     try {
       return await this.fetchChatStream(messages, tracking);
     } catch (error) {
-      const isErrorLike = error instanceof Error ||
-        (typeof error === 'object' && error !== null && 'message' in error);
-      const msg = isErrorLike ? String((error as { message: string }).message) : '';
-      const name = isErrorLike && 'name' in (error as object) ? String((error as { name: string }).name) : '';
-      const timedOut = name === 'AbortError' || msg.includes('aborted') || msg.includes('abort');
-      const timeoutSec = Math.trunc(this.timeoutMs / 1000);
-      const message = timedOut
-        ? `Request timed out after ${timeoutSec} seconds`
-        : msg || 'Unknown error';
       console.error('[ElderGPT] AI streaming error', error);
-      const errorText = this.formatError(message);
+      const errorText = this.formatError(this.describeError(error));
       if (accumulated) {
         const suffix = '\n\n' + errorText;
         onChunk(suffix);

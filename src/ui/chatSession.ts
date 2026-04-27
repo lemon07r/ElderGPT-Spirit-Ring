@@ -203,6 +203,10 @@ export function renameSession(name: string) {
   persistCurrentSession();
 }
 
+export function flushSession() {
+  persistCurrentSession();
+}
+
 export function resetChatSession() {
   startNewChat();
 }

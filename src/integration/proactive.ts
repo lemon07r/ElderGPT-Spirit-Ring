@@ -1,8 +1,8 @@
-import type { CombatEntity, CraftingResult, EnemyEntity, Item } from 'afnm-types';
+import type { CraftingResult, EnemyEntity, Item } from 'afnm-types';
 import { AIClient } from '../ai/client';
 import { selectKnowledge } from '../ai/knowledge';
 import { readSettingsSnapshot } from '../config/settings';
-import { appendAssistantMessage } from '../ui/chatSession';
+import { appendAssistantMessage, readChatSessionSnapshot } from '../ui/chatSession';
 import { extractContext, getSystemPrompt } from './contextEngine';
 import { readGameStateSnapshot } from './gameState';
 
@@ -39,8 +39,13 @@ type ProactiveTrigger =
     };
 
 const MOD_TAG = '[ElderGPT]';
+interface QueueEntry {
+  trigger: ProactiveTrigger;
+  sessionId: string;
+}
+
 const MIN_PROACTIVE_INTERVAL_MS = 45_000;
-const queue: ProactiveTrigger[] = [];
+const queue: QueueEntry[] = [];
 
 let hooksRegistered = false;
 let isProcessing = false;
@@ -103,8 +108,13 @@ async function processQueue() {
 
       await waitForCooldown();
 
-      const trigger = queue.shift();
-      if (!trigger) {
+      const entry = queue.shift();
+      if (!entry) {
+        continue;
+      }
+
+      // Skip if the user switched sessions since the trigger was enqueued
+      if (readChatSessionSnapshot().sessionId !== entry.sessionId) {
         continue;
       }
 
@@ -126,11 +136,16 @@ async function processQueue() {
         },
         {
           role: 'user',
-          content: `${describeTrigger(trigger)} Keep it to at most two short sentences. If there is no materially useful advice, reply with exactly "SKIP". Do not mention hooks, APIs, or system internals.`,
+          content: `${describeTrigger(entry.trigger)} Keep it to at most two short sentences. If there is no materially useful advice, reply with exactly "SKIP". Do not mention hooks, APIs, or system internals.`,
         },
       ]);
 
       if (response === 'SKIP' || response.startsWith('[System:')) {
+        continue;
+      }
+
+      // Final check: still on the same session before appending
+      if (readChatSessionSnapshot().sessionId !== entry.sessionId) {
         continue;
       }
 
@@ -149,7 +164,7 @@ function enqueue(trigger: ProactiveTrigger) {
     return;
   }
 
-  queue.push(trigger);
+  queue.push({ trigger, sessionId: readChatSessionSnapshot().sessionId });
   void processQueue();
 }
 

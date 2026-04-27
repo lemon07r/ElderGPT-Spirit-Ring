@@ -55,7 +55,7 @@ function lookupStatic(modelId: string): ModelLimits {
   const id = modelId.toLowerCase();
   if (MODEL_TABLE[id]) return MODEL_TABLE[id];
   for (const [key, limits] of Object.entries(MODEL_TABLE)) {
-    if (id.startsWith(key) || id.includes(key)) return limits;
+    if (id.startsWith(key)) return limits;
   }
   return { contextWindow: DEFAULT_CONTEXT_WINDOW, maxOutput: DEFAULT_MAX_OUTPUT };
 }

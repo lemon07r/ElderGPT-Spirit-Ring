@@ -55,7 +55,7 @@ const MOD_TAG = '[ElderGPT]';
 const listeners = new Set<() => void>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object';
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function normalizePersona(value: unknown): Persona {

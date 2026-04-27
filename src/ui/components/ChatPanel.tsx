@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AIClient, Message } from '../../ai/client';
 import { needsCompaction, compactConversation } from '../../ai/compaction';
 import { selectKnowledge } from '../../ai/knowledge';
-import { detectModelLimits, getStaticModelLimits } from '../../ai/modelLimits';
+import { getStaticModelLimits } from '../../ai/modelLimits';
 import { estimateTokens } from '../../ai/tokenEstimator';
 import {
   FONT_SIZES,
@@ -18,6 +18,7 @@ import { readGameStateSnapshot, subscribeToGameState } from '../../integration/g
 import {
   appendAssistantMessage,
   appendUserMessage,
+  flushSession,
   readChatSessionSnapshot,
   renameSession,
   replaceMessages,
@@ -76,9 +77,20 @@ const STATUS_LABELS: Record<ConnectionStatus, string> = {
   offline: 'Offline',
 };
 
+const stopEventPropagation = (event: React.SyntheticEvent) => {
+  event.stopPropagation();
+};
+const stopShortcutPropagation = (event: React.KeyboardEvent) => {
+  if (event.ctrlKey || event.metaKey) {
+    event.stopPropagation();
+  }
+};
+
 export function ChatPanel({ corner, setCorner, onClose }: Props) {
   const dragRef = useRef<HTMLDivElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const [savedPosition, setSavedPosition] = useState<{ x: number; y: number } | null>(() => loadPanelPosition());
 
   const handleDragEnd = (pos: { x: number; y: number }) => {
@@ -94,6 +106,9 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
   const [showSettings, setShowSettings] = useState(false);
   const [showSessions, setShowSessions] = useState(false);
   const [input, setInput] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
+  const [sessionList, setSessionList] = useState<Array<{ id: string; name: string; createdAt: number; updatedAt: number }>>([]);
   const settings = useSyncExternalStore(subscribeToSettings, readSettingsSnapshot, readSettingsSnapshot);
   const chatState = useSyncExternalStore(
     subscribeToChatSession,
@@ -105,10 +120,36 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
     readGameStateSnapshot,
     readGameStateSnapshot,
   );
-  const context = extractContext(snapshot);
+  const context = useMemo(() => extractContext(snapshot), [snapshot]);
   const { messages, isLoading, sessionName } = chatState;
   const dim = PANEL_DIMENSIONS[settings.panelSize];
   const fontSize = FONT_SIZES[settings.fontSize];
+
+  const refreshSessionList = useCallback(() => {
+    flushSession();
+    setSessionList(listSessions());
+  }, []);
+
+  useEffect(() => {
+    if (showSessions) {
+      refreshSessionList();
+    }
+  }, [showSessions, chatState.sessionId, chatState.sessionName, refreshSessionList]);
+
+  // Clear confirm-delete when session panel closes
+  useEffect(() => {
+    if (!showSessions) {
+      setConfirmDeleteId(null);
+      setHoveredSessionId(null);
+    }
+  }, [showSessions]);
+
+  // Auto-reset confirm-delete after timeout
+  useEffect(() => {
+    if (!confirmDeleteId) return;
+    const timer = globalThis.setTimeout(() => setConfirmDeleteId(null), 3000);
+    return () => globalThis.clearTimeout(timer);
+  }, [confirmDeleteId]);
 
   const getPositionStyles = (): React.CSSProperties => {
     if (dragPos) return { top: dragPos.y, left: dragPos.x };
@@ -120,10 +161,13 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
     return { top: pos.y, left: pos.x };
   };
 
+  // Scroll to bottom on new messages, use 'auto' during streaming to avoid animation pileup
   useEffect(() => {
+    const isStreaming = isLoading && messages.length > 0 &&
+      messages[messages.length - 1]?.role === 'assistant';
     messageListRef.current?.scrollTo({
       top: messageListRef.current.scrollHeight,
-      behavior: 'smooth',
+      behavior: isStreaming ? 'auto' : 'smooth',
     });
   }, [messages, isLoading]);
 
@@ -142,6 +186,23 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
     window.addEventListener('keydown', handleTextShortcut, true);
     return () => window.removeEventListener('keydown', handleTextShortcut, true);
   }, []);
+
+  // Escape key to close/minimize
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (!dragRef.current?.contains(document.activeElement) && document.activeElement !== document.body) return;
+      if (showSettings) {
+        setShowSettings(false);
+      } else if (showSessions) {
+        setShowSessions(false);
+      } else {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleEscape, true);
+    return () => window.removeEventListener('keydown', handleEscape, true);
+  }, [showSettings, showSessions, onClose]);
 
   const generateSessionTitle = async (client: AIClient) => {
     const snap = readChatSessionSnapshot();
@@ -162,12 +223,16 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
     } catch { /* title generation is best-effort */ }
   };
 
+  const handleAbort = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
+
   const handleSend = async () => {
     const trimmedInput = input.trim();
     if (!trimmedInput || isLoading) return;
 
     const userMessage: Message = { role: 'user', content: trimmedInput };
-    const currentMessages = [...readChatSessionSnapshot().messages, userMessage];
     appendUserMessage(trimmedInput);
     setInput('');
     setChatLoading(true);
@@ -181,6 +246,9 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
     const systemContent = getSystemPrompt(settings.persona, settings.customPrompt, context, knowledgeBlock);
     const systemTokens = estimateTokens(systemContent);
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     const client = new AIClient({
       url: settings.apiUrl,
       apiKey: settings.apiKey,
@@ -190,55 +258,103 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
       maxOutputTokens: settings.outputLimitTokens ?? undefined,
     });
 
-    let chatMessages = currentMessages;
-
-    if (needsCompaction(systemTokens, chatMessages, contextWindow, outputReserve)) {
-      const result = await compactConversation(chatMessages, client);
-      if (result.compacted) {
-        chatMessages = result.messages;
-        replaceMessages(result.messages);
-      }
-    }
+    // Read messages after appendUserMessage to get the authoritative state
+    let chatMessages = readChatSessionSnapshot().messages;
 
     const needsTitle = settings.autoTitle
       && readChatSessionSnapshot().sessionName === 'New Chat';
 
     try {
+      if (needsCompaction(systemTokens, chatMessages, contextWindow, outputReserve)) {
+        const result = await compactConversation(chatMessages, client);
+        if (result.compacted) {
+          chatMessages = result.messages;
+          replaceMessages(result.messages);
+        }
+      }
+
+      if (controller.signal.aborted) return;
+
       if (settings.showStreaming) {
         startStreamingMessage();
         const response = await client.chatStream(
           [{ role: 'system', content: systemContent }, ...chatMessages],
-          (chunk) => appendStreamChunk(chunk),
+          (chunk) => {
+            if (!controller.signal.aborted) appendStreamChunk(chunk);
+          },
         );
-        finalizeStreamingMessage(response);
+        if (!controller.signal.aborted) {
+          finalizeStreamingMessage(response);
+        }
       } else {
-        const response = await client.chatStream(
+        const response = await client.chat(
           [{ role: 'system', content: systemContent }, ...chatMessages],
-          () => {},
         );
-        appendAssistantMessage(response);
+        if (!controller.signal.aborted) {
+          appendAssistantMessage(response);
+        }
       }
 
-      if (needsTitle) {
+      if (needsTitle && !controller.signal.aborted) {
         generateSessionTitle(client).catch(() => {});
       }
     } finally {
+      abortRef.current = null;
       setChatLoading(false);
+    }
+  };
+
+  const handleSessionSwitch = (id: string) => {
+    switchToSession(id);
+    setConfirmDeleteId(null);
+    // Don't close the panel - let user stay and browse
+  };
+
+  const handleSessionDelete = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirmDeleteId === id) {
+      // Second click - actually delete
+      const isActive = id === chatState.sessionId;
+      deleteSession(id);
+      setConfirmDeleteId(null);
+      if (isActive) {
+        // Deleted the active session - switch to the most recent or create new
+        const remaining = listSessions().filter((s) => s.id !== id);
+        if (remaining.length > 0) {
+          switchToSession(remaining[0].id);
+        } else {
+          startNewChat();
+        }
+      }
+      refreshSessionList();
+    } else {
+      // First click - show confirmation
+      setConfirmDeleteId(id);
+    }
+  };
+
+  const handleNewChatFromPanel = () => {
+    startNewChat();
+    setShowSessions(false);
+  };
+
+  // Auto-resize textarea
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  };
+
+  const handleInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleSend();
     }
   };
 
   const connectionStatus = getConnectionStatus(context.source);
   const contextLabel = `${context.status} · ${context.location}`;
-  const sessions = showSessions ? listSessions() : [];
-
-  const stopEventPropagation = (event: React.SyntheticEvent) => {
-    event.stopPropagation();
-  };
-  const stopShortcutPropagation = (event: React.KeyboardEvent) => {
-    if (event.ctrlKey || event.metaKey) {
-      event.stopPropagation();
-    }
-  };
 
   const isStreamingWithContent = settings.showStreaming && isLoading &&
     messages.length > 0 &&
@@ -251,6 +367,7 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
       ref={dragRef}
       role="dialog"
       aria-label="Spirit Ring Chat"
+      aria-modal="true"
       onKeyDown={stopEventPropagation}
       onKeyUp={stopEventPropagation}
       onMouseDown={stopEventPropagation}
@@ -320,7 +437,10 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
             aria-label="Chat history"
             type="button"
             onClick={() => { setShowSessions(!showSessions); setShowSettings(false); }}
-            style={headerButtonStyle}
+            style={{
+              ...headerButtonStyle,
+              color: showSessions ? '#C5A059' : '#aaa',
+            }}
             title="Chat history"
           >
             ☰
@@ -338,7 +458,10 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
             aria-label="Open settings"
             type="button"
             onClick={() => { setShowSettings(!showSettings); setShowSessions(false); }}
-            style={headerButtonStyle}
+            style={{
+              ...headerButtonStyle,
+              color: showSettings ? '#C5A059' : '#aaa',
+            }}
             title="Settings"
           >
             ⚙
@@ -359,58 +482,146 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
       {showSessions && (
         <div style={{
           flex: 1,
-          padding: '10px',
-          overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: '4px',
+          overflow: 'hidden',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          {/* Session panel header */}
+          <div style={{
+            padding: '10px 12px',
+            borderBottom: '1px solid rgba(197, 160, 89, 0.15)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}>
             <span style={{ color: '#C5A059', fontWeight: 'bold', fontSize: '13px' }}>Chat History</span>
-            <button type="button" onClick={() => setShowSessions(false)} style={{ ...headerButtonStyle, fontSize: '12px' }}>Back</button>
-          </div>
-          {sessions.length === 0 && (
-            <div style={{ color: '#888', fontSize: '12px', textAlign: 'center', padding: '20px' }}>No saved chats</div>
-          )}
-          {sessions.map((s) => {
-            const isActive = s.id === chatState.sessionId;
-            return (
-              <div
-                key={s.id}
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                type="button"
+                onClick={handleNewChatFromPanel}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px',
-                  borderRadius: '6px',
-                  backgroundColor: isActive ? 'rgba(197, 160, 89, 0.15)' : 'rgba(0,0,0,0.2)',
-                  border: `1px solid ${isActive ? '#C5A059' : 'rgba(197, 160, 89, 0.1)'}`,
-                  cursor: isActive ? 'default' : 'pointer',
+                  ...sessionActionButtonStyle,
+                  backgroundColor: 'rgba(197, 160, 89, 0.15)',
+                  color: '#C5A059',
+                  borderColor: 'rgba(197, 160, 89, 0.4)',
                 }}
-                onClick={() => { if (!isActive) { switchToSession(s.id); setShowSessions(false); } }}
+                title="Start new chat"
               >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '12px', color: isActive ? '#f3ddab' : '#ddd', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {s.name}
+                + New Chat
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSessions(false)}
+                style={sessionActionButtonStyle}
+              >
+                Back
+              </button>
+            </div>
+          </div>
+
+          {/* Session list */}
+          <div style={{
+            flex: 1,
+            padding: '8px',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}>
+            {sessionList.length === 0 && (
+              <div style={{ color: '#888', fontSize: '12px', textAlign: 'center', padding: '20px' }}>No saved chats</div>
+            )}
+            {sessionList.map((s) => {
+              const isActive = s.id === chatState.sessionId;
+              const isHovered = hoveredSessionId === s.id;
+              const isConfirmingDelete = confirmDeleteId === s.id;
+              return (
+                <div
+                  key={s.id}
+                  onMouseEnter={() => setHoveredSessionId(s.id)}
+                  onMouseLeave={() => setHoveredSessionId(null)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    backgroundColor: isConfirmingDelete
+                      ? 'rgba(248, 113, 113, 0.1)'
+                      : isActive
+                        ? 'rgba(197, 160, 89, 0.15)'
+                        : isHovered
+                          ? 'rgba(197, 160, 89, 0.07)'
+                          : 'rgba(0,0,0,0.2)',
+                    border: `1px solid ${
+                      isConfirmingDelete
+                        ? 'rgba(248, 113, 113, 0.3)'
+                        : isActive
+                          ? '#C5A059'
+                          : isHovered
+                            ? 'rgba(197, 160, 89, 0.25)'
+                            : 'rgba(197, 160, 89, 0.1)'
+                    }`,
+                    cursor: isActive ? 'default' : 'pointer',
+                    transition: 'background-color 0.15s, border-color 0.15s',
+                  }}
+                  onClick={() => { if (!isActive) handleSessionSwitch(s.id); }}
+                >
+                  {/* Active indicator */}
+                  {isActive && (
+                    <div style={{
+                      width: '3px',
+                      height: '24px',
+                      borderRadius: '2px',
+                      backgroundColor: '#C5A059',
+                      flexShrink: 0,
+                    }} />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: '12px',
+                      color: isActive ? '#f3ddab' : '#ddd',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      fontWeight: isActive ? 600 : 400,
+                    }}>
+                      {s.name}
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#888', marginTop: '3px' }}>
+                      {new Date(s.updatedAt).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>
-                    {new Date(s.updatedAt).toLocaleDateString()}
-                  </div>
-                </div>
-                {!isActive && (
+                  {/* Delete button - always visible on hover or when confirming */}
                   <button
                     type="button"
-                    aria-label="Delete chat"
-                    onClick={(e) => { e.stopPropagation(); deleteSession(s.id); setShowSessions(false); setShowSessions(true); }}
-                    style={{ ...headerButtonStyle, fontSize: '11px', color: '#f87171' }}
-                    title="Delete"
+                    aria-label={isConfirmingDelete ? 'Confirm delete' : 'Delete chat'}
+                    onClick={(e) => handleSessionDelete(s.id, e)}
+                    style={{
+                      ...deleteButtonStyle,
+                      opacity: isConfirmingDelete || isHovered ? 1 : 0,
+                      backgroundColor: isConfirmingDelete
+                        ? 'rgba(248, 113, 113, 0.2)'
+                        : 'transparent',
+                      color: isConfirmingDelete ? '#f87171' : '#888',
+                      borderColor: isConfirmingDelete
+                        ? 'rgba(248, 113, 113, 0.4)'
+                        : 'rgba(255,255,255,0.1)',
+                      pointerEvents: isConfirmingDelete || isHovered ? 'auto' : 'none',
+                    }}
+                    title={isConfirmingDelete ? 'Click again to confirm' : 'Delete'}
                   >
-                    ✕
+                    {isConfirmingDelete ? 'Delete?' : '✕'}
                   </button>
-                )}
-              </div>
-            );
-          })}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -502,20 +713,22 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
               padding: '10px',
               borderTop: '1px solid rgba(197, 160, 89, 0.3)',
               display: 'flex',
+              alignItems: 'flex-end',
             }}
           >
-            <input
+            <textarea
+              ref={textareaRef}
               aria-label="Ask Spirit Ring for guidance"
-              type="text"
               placeholder="Ask for guidance..."
               value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => event.key === 'Enter' && handleSend()}
+              onChange={handleInputChange}
+              onKeyDown={handleInputKeyDown}
               onKeyDownCapture={stopShortcutPropagation}
               onKeyUpCapture={stopShortcutPropagation}
               onPasteCapture={stopEventPropagation}
               onCopyCapture={stopEventPropagation}
               onCutCapture={stopEventPropagation}
+              rows={1}
               style={{
                 flex: 1,
                 backgroundColor: 'rgba(0,0,0,0.5)',
@@ -525,26 +738,54 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
                 borderRadius: '4px',
                 outline: 'none',
                 fontSize: `${fontSize}px`,
+                resize: 'none',
+                minHeight: '36px',
+                maxHeight: '120px',
+                lineHeight: '1.4',
+                fontFamily: 'sans-serif',
               }}
             />
-            <button
-              aria-label="Send guidance request"
-              type="button"
-              onClick={handleSend}
-              disabled={isLoading || !input.trim()}
-              style={{
-                marginLeft: '8px',
-                backgroundColor: isLoading || !input.trim() ? 'transparent' : 'rgba(197, 160, 89, 0.2)',
-                border: `1px solid ${isLoading || !input.trim() ? '#555' : '#C5A059'}`,
-                color: isLoading || !input.trim() ? '#555' : '#C5A059',
-                padding: '8px 12px',
-                borderRadius: '4px',
-                cursor: isLoading || !input.trim() ? 'default' : 'pointer',
-                fontSize: `${fontSize}px`,
-              }}
-            >
-              Send
-            </button>
+            {isLoading ? (
+              <button
+                aria-label="Stop generation"
+                type="button"
+                onClick={handleAbort}
+                style={{
+                  marginLeft: '8px',
+                  backgroundColor: 'rgba(248, 113, 113, 0.2)',
+                  border: '1px solid #f87171',
+                  color: '#f87171',
+                  padding: '8px 12px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: `${fontSize}px`,
+                  alignSelf: 'stretch',
+                }}
+                title="Stop generating"
+              >
+                Stop
+              </button>
+            ) : (
+              <button
+                aria-label="Send guidance request"
+                type="button"
+                onClick={handleSend}
+                disabled={!input.trim()}
+                style={{
+                  marginLeft: '8px',
+                  backgroundColor: !input.trim() ? 'transparent' : 'rgba(197, 160, 89, 0.2)',
+                  border: `1px solid ${!input.trim() ? '#555' : '#C5A059'}`,
+                  color: !input.trim() ? '#555' : '#C5A059',
+                  padding: '8px 12px',
+                  borderRadius: '4px',
+                  cursor: !input.trim() ? 'default' : 'pointer',
+                  fontSize: `${fontSize}px`,
+                  alignSelf: 'stretch',
+                }}
+              >
+                Send
+              </button>
+            )}
           </div>
         </>
       ) : null}
@@ -560,4 +801,27 @@ const headerButtonStyle: React.CSSProperties = {
   fontSize: '16px',
   padding: '2px 4px',
   lineHeight: 1,
+};
+
+const sessionActionButtonStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid rgba(255,255,255,0.15)',
+  color: '#aaa',
+  cursor: 'pointer',
+  fontSize: '11px',
+  padding: '4px 10px',
+  borderRadius: '4px',
+  lineHeight: 1.3,
+};
+
+const deleteButtonStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid transparent',
+  cursor: 'pointer',
+  fontSize: '11px',
+  padding: '4px 8px',
+  borderRadius: '4px',
+  lineHeight: 1.3,
+  flexShrink: 0,
+  transition: 'opacity 0.15s, background-color 0.15s, color 0.15s',
 };

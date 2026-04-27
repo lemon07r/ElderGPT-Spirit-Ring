@@ -327,8 +327,8 @@ export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelP
       </p>
 
       <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <button type="button" onClick={onClose} style={{ padding: '8px', backgroundColor: '#C5A059', border: 'none', color: '#0F0F14', fontWeight: 'bold', cursor: 'pointer' }}>
-          Save & Back
+        <button type="button" onClick={onClose} style={{ padding: '8px', backgroundColor: '#C5A059', border: 'none', color: '#0F0F14', fontWeight: 'bold', cursor: 'pointer', borderRadius: '4px' }}>
+          Done
         </button>
         <div style={{ textAlign: 'center', color: '#665e50', fontSize: '10px' }}>
           Spirit Ring v{typeof MOD_VERSION !== 'undefined' ? MOD_VERSION : '?'}
