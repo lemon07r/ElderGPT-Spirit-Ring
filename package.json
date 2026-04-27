@@ -1,6 +1,6 @@
 {
   "name": "afnm-eldergpt-spirit-ring",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "AI-powered contextual chat assistant mod for Ascend From Nine Mountains",
   "author": {
     "name": "Lamim"
@@ -30,7 +30,7 @@
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/react-dom": "^19.2.3",
-    "afnm-types": "0.6.50",
+    "afnm-types": "0.6.52-v2",
     "file-loader": "^6.2.0",
     "jest": "^30.2.0",
     "prettier": "^3.8.1",

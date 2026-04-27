@@ -51,6 +51,15 @@ DIFFICULTY MULTIPLIERS:
 - Realm multipliers: mundane=0.9, bodyForging=1.0, meridianOpening=1.2, qiCondensation=1.5, coreFormation=2.0, pillarCreation=2.7, lifeFlourishing=3.5, worldShaping=4.5, innerGenesis=6.0, soulAscension=9.0
 - Recipe difficulty multipliers: easy=1, medium=1.4, hard=1.5, veryhard=1.7, veryhard+=2.75, extreme=3.7
 
+SOCIAL STAT EFFECTS:
+- Battlesense: Number of stances the player can create, stance-switch power bonus
+- Craftskill: Qi Control and Qi Intensity bonus for crafting
+- Charisma: Presence and shop prices
+- Artefact Slots: Number of equippable artefacts
+- Talisman Slots: Number of equippable talismans
+- Condense Efficiency: Qi to Qi Droplet conversion rate
+- Pills Per Round: Items usable per combat round
+
 REPUTATION TIERS:
 - neutral (0), friendly (5), respected (10), honoured (15), revered (20), exalted (25)
 - 5 reputation points per tier`;

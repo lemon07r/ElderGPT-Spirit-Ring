@@ -236,11 +236,14 @@ function createSnapshot(overrides: Partial<RootState> = {}): RootState {
 
 describe('extractContext', () => {
   it('returns a stable fallback when no snapshot is available', () => {
-    expect(extractContext(null)).toEqual(
+    const ctx = extractContext(null);
+    expect(ctx).toEqual(
       expect.objectContaining({
         source: 'unavailable',
         status: 'Idle',
         location: 'Unknown Region',
+        maxTechniqueSlots: null,
+        soulShardDelve: null,
       }),
     );
   });

@@ -1,4 +1,4 @@
-import type { CombatEntity, CombatStatsMap, Item, ItemDesc, RootState, Translatable } from 'afnm-types';
+import type { CombatEntity, CombatStatsMap, Item, ItemDesc, Realm, RootState, Translatable } from 'afnm-types';
 import { getGameStateSource, readGameStateSnapshot } from './gameState';
 
 // ---------------------------------------------------------------------------
@@ -50,6 +50,11 @@ interface EventSummaryContext {
   texts: string[];
 }
 
+interface SoulShardDelveContext {
+  floor: number;
+  maxFloor: number;
+}
+
 export interface GameContext {
   source: ReturnType<typeof getGameStateSource>;
   status: string;
@@ -72,6 +77,7 @@ export interface GameContext {
     affinities: Record<string, number> | null;
     reputation: Record<string, number> | null;
   };
+  maxTechniqueSlots: number | null;
   equipment: EquipmentPiece[];
   inventory: InventoryEntry[];
   techniques: string[];
@@ -85,6 +91,7 @@ export interface GameContext {
   flagCount: number;
   combat: CombatContext | null;
   crafting: CraftingContext | null;
+  soulShardDelve: SoulShardDelveContext | null;
   recentEvents: EventSummaryContext[];
 }
 
@@ -104,10 +111,12 @@ const DEFAULT_CONTEXT: GameContext = {
     injured: false, partySize: 0,
     physicalStats: null, socialStats: null, affinities: null, reputation: null,
   },
+  maxTechniqueSlots: null,
   equipment: [], inventory: [], techniques: [], craftingActions: [],
   stances: [], quests: [], characters: [], guild: null,
   calendar: { year: null, month: null, day: null },
-  activeEvent: false, flagCount: 0, combat: null, crafting: null, recentEvents: [],
+  activeEvent: false, flagCount: 0, combat: null, crafting: null,
+  soulShardDelve: null, recentEvents: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -116,7 +125,16 @@ const DEFAULT_CONTEXT: GameContext = {
 
 function asString(value: Translatable | string | undefined, fallback: string): string {
   if (typeof value === 'string' && value.trim()) return value;
-  if (value && typeof value === 'object' && 'key' in value && typeof value.key === 'string') return value.key;
+  if (value && typeof value === 'object') {
+    try {
+      const t = typeof window !== 'undefined' ? window.modAPI?.utils?.t : undefined;
+      if (t) {
+        const translated = t(value as Translatable);
+        if (translated && translated.trim()) return translated;
+      }
+    } catch { /* fall through */ }
+    if ('key' in value && typeof value.key === 'string') return value.key;
+  }
   return fallback;
 }
 
@@ -196,6 +214,24 @@ function extractKeyStats(statsMap: Partial<CombatStatsMap>): Record<string, numb
     if (typeof v === 'number' && v !== 0) out[k] = v;
   }
   return Object.keys(out).length > 0 ? out : null;
+}
+
+function getTechniqueSlots(realm: string | null | undefined): number | null {
+  if (!realm) return null;
+  try {
+    const fn = typeof window !== 'undefined' ? window.modAPI?.utils?.getTechniqueSlots : undefined;
+    if (fn) return fn(realm as Realm);
+  } catch { /* unavailable */ }
+  return null;
+}
+
+function extractSoulShardDelve(snapshot: RootState): SoulShardDelveContext | null {
+  const delve = snapshot.soulShardDelve;
+  if (!delve || typeof delve !== 'object') return null;
+  const floor = (delve as { currentFloor?: number }).currentFloor;
+  const maxFloor = (delve as { maxFloor?: number }).maxFloor;
+  if (typeof floor !== 'number') return null;
+  return { floor, maxFloor: typeof maxFloor === 'number' ? maxFloor : floor };
 }
 
 function deriveStatus(snapshot: RootState): string {
@@ -326,11 +362,14 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
       affinities: nonZeroMap(p.affinities),
       reputation: p.reputation && Object.keys(p.reputation).length > 0 ? { ...p.reputation } : null,
     },
+    maxTechniqueSlots: getTechniqueSlots(p.realm),
     equipment, inventory, techniques, craftingActions, stances, quests, characters, guild,
     calendar: { year: snapshot.calendar.year ?? null, month: snapshot.calendar.month ?? null, day: snapshot.calendar.day ?? null },
     activeEvent: Boolean(snapshot.gameEvent.gameEvent),
     flagCount: Object.keys(snapshot.gameData.flags ?? {}).length,
-    combat, crafting, recentEvents,
+    combat, crafting,
+    soulShardDelve: extractSoulShardDelve(snapshot),
+    recentEvents,
   };
 }
 
@@ -364,7 +403,7 @@ function buildSystemPrompt(persona: string, customPrompt: string, context: GameC
   parts.push(`\
 RULES:
 - Reference the player's live game state (shown below) in every answer.
-- You CAN see: equipped item stats, player stats, combat stats, inventory, techniques, quests, NPCs.
+- You CAN see: equipped item stats, player stats, combat stats, inventory, techniques, stances (with slot counts), quests, NPCs.
 - You CANNOT see: stats of items not equipped/in inventory, enemy internals beyond what combat shows, hidden formulas beyond your knowledge base.
 - NEVER fabricate stats, formulas, or item data. If you lack data, say so IMMEDIATELY in your first sentence.
 - When calculating, state which values you used and where they came from.
@@ -489,10 +528,14 @@ function formatGameState(context: GameContext): string {
   if (context.status === 'Crafting' && context.craftingActions.length > 0) {
     lines.push('', `=== CRAFTING ACTIONS === ${context.craftingActions.join(', ')}`);
   }
-  // Stances: only when in combat
-  if (context.status === 'InCombat' && context.stances.length > 0) {
-    lines.push('', '=== STANCES ===');
-    for (const s of context.stances) lines.push(`${s.name}: ${s.techniques.join(' > ')}`);
+  // Stances: combat and idle/event (users plan builds outside combat)
+  if (context.status !== 'Crafting' && context.stances.length > 0) {
+    const slotInfo = context.maxTechniqueSlots ? ` (${context.maxTechniqueSlots} technique slots per stance)` : '';
+    lines.push('', `=== STANCES ===${slotInfo}`);
+    for (const s of context.stances) {
+      const fill = context.maxTechniqueSlots ? ` [${s.techniques.length}/${context.maxTechniqueSlots}]` : '';
+      lines.push(`${s.name}${fill}: ${s.techniques.join(' > ')}`);
+    }
   }
 
   // Inventory: always (compact one-liner)
@@ -516,6 +559,11 @@ function formatGameState(context: GameContext): string {
       if (c.isFollowing) p.push('(following)');
       lines.push(p.join(' | '));
     }
+  }
+
+  // Soul Shard Delve
+  if (context.soulShardDelve) {
+    lines.push(`Soul Shard Delve: Floor ${context.soulShardDelve.floor}/${context.soulShardDelve.maxFloor}`);
   }
 
   // Reputation

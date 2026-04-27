@@ -3,7 +3,7 @@ title: Context Engine
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-12
+last_verified: 2026-04-27
 source_of_truth: src/integration/contextEngine.ts + src/integration/gameState.ts + src/ai/knowledge/
 review_cycle_days: 30
 related_files: src/integration/contextEngine.ts,src/integration/gameState.ts,src/ai/knowledge/index.ts,src/ai/knowledge/statFormulas.ts,src/ui/components/ChatPanel.tsx
@@ -39,7 +39,7 @@ The `GameContext` payload includes:
 
 - **Crafting actions**: known crafting technique names.
 
-- **Stances**: stance names with technique sequences.
+- **Stances**: stance names with technique sequences and fill count vs max technique slots (realm-dependent via `getTechniqueSlots`).
 
 - **Quests**: active quest names with step progress.
 
@@ -73,7 +73,7 @@ The game state is formatted with status-aware section inclusion to avoid filling
 | Combat stats | Yes | No | No |
 | Crafting stats | No | Yes | No |
 | Techniques | Yes | No | Yes |
-| Stances | Yes | No | No |
+| Stances (with slot counts) | Yes | No | Yes |
 | Crafting actions | No | Yes | No |
 | Inventory | Always | Always | Always |
 | Quests | No | No | Yes |
