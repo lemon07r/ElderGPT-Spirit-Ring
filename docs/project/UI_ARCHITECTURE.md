@@ -3,7 +3,7 @@ title: UI Architecture
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-12
+last_verified: 2026-04-27
 source_of_truth: src/ui + src/ui/chatSession.ts + src/ui/sessionManager.ts + src/config/settings.ts + src/integration/uiBridge.tsx
 review_cycle_days: 30
 related_files: src/ui/index.tsx,src/ui/ElderGPTApp.tsx,src/ui/chatSession.ts,src/ui/sessionManager.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ui/components/SettingsPanel.tsx,src/ui/components/SpiritRingToggle.tsx,src/integration/uiBridge.tsx
@@ -24,12 +24,12 @@ This remains intentional for now:
 
 Installed-runtime note:
 
-- AFNM `0.6.50` exposes a usable global `ReactDOM.createRoot()` surface, but agents should not assume a separate `react-dom/client` import path is interchangeable.
+- AFNM `0.6.52` exposes a usable global `ReactDOM.createRoot()` surface, but agents should not assume a separate `react-dom/client` import path is interchangeable.
 - Keep renderer bootstrap logic in `src/ui/index.tsx` aligned to the live runtime surface verified through direct-binary smoke tests.
 
 ## Official UI Integration
 
-AFNM `0.6.50` supports `window.modAPI.injectUI()`, and the mod now uses it for targeted affordances instead of treating it as future-only documentation.
+AFNM `0.6.52` supports `window.modAPI.injectUI()`, and the mod now uses it for targeted affordances instead of treating it as future-only documentation.
 
 Current usage:
 

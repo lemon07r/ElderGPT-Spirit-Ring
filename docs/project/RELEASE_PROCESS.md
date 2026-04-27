@@ -3,7 +3,7 @@ title: Release Process
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-06
+last_verified: 2026-04-27
 source_of_truth: package.json,scripts/workshop-upload.ts,.github/workflows/release.yml,../ModUploader-AFNM/electron/main/cli.ts
 review_cycle_days: 30
 related_files: package.json,scripts/workshop-upload.ts,docs/project/LIVE_GAME_TESTING.md,.github/workflows/release.yml,AGENTS.md
@@ -98,7 +98,7 @@ Equivalent explicit uploader command:
 ```bash
 cd ../ModUploader-AFNM
 bun run cli:prepare
-bun run cli:upload -- --workshop-id 3661729323 --zip /absolute/path/to/builds/afnm-eldergpt-spirit-ring.zip --change-note "vX.Y.Z - release notes" --visibility public
+bun run cli:upload -- --workshop-id 3701616500 --zip /absolute/path/to/builds/afnm-eldergpt-spirit-ring.zip --change-note "vX.Y.Z - release notes" --visibility public
 ```
 
 This requires the sibling `../ModUploader-AFNM` repo and a working local Steam environment for the actual upload step.

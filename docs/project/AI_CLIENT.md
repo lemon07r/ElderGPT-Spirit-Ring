@@ -3,7 +3,7 @@ title: AI Client
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-12
+last_verified: 2026-04-27
 source_of_truth: src/ai/client.ts + src/ai/modelLimits.ts + src/ai/compaction.ts + src/ai/tokenEstimator.ts
 review_cycle_days: 30
 related_files: src/ai/client.ts,src/ai/modelLimits.ts,src/ai/compaction.ts,src/ai/tokenEstimator.ts,src/ui/components/ChatPanel.tsx,src/integration/contextEngine.ts,src/config/settings.ts

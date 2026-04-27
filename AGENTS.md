@@ -46,7 +46,7 @@ Use bun for dependency changes.
 
 ## ModAPI Rules
 
-As of AFNM `0.6.50`, use official APIs first:
+As of AFNM `0.6.52`, use official APIs first:
 
 1. `window.modAPI.getGameStateSnapshot()`
 2. `window.modAPI.subscribe()`

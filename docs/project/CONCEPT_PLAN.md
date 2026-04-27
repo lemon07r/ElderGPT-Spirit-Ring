@@ -3,7 +3,7 @@ title: Concept Plan
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-06
+last_verified: 2026-04-27
 source_of_truth: current product direction maintained in-repo
 review_cycle_days: 45
 related_files: docs/project/ARCHITECTURE.md,docs/project/MODAPI_0_6_49_AUDIT.md,src/ui/components/ChatPanel.tsx

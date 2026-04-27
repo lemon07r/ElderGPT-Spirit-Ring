@@ -3,7 +3,7 @@ title: Documentation Inventory
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-06
+last_verified: 2026-04-27
 source_of_truth: repository markdown file inventory
 review_cycle_days: 30
 related_files: AGENTS.md,docs/reference/AFNM_MODDING.md,scripts/docs/generate-inventory.js
@@ -11,7 +11,7 @@ related_files: AGENTS.md,docs/reference/AFNM_MODDING.md,scripts/docs/generate-in
 
 # Documentation Inventory
 
-Generated on: 2026-04-06
+Generated on: 2026-04-27
 
 ## Summary
 

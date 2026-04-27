@@ -3,8 +3,8 @@ title: Mod Architecture
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-12
-source_of_truth: src/integration, src/ui, src/ai, src/config, live AFNM 0.6.50 runtime
+last_verified: 2026-04-27
+source_of_truth: src/integration, src/ui, src/ai, src/config, live AFNM 0.6.52 runtime
 review_cycle_days: 30
 related_files: src/integration/index.ts,src/integration/gameState.ts,src/integration/contextEngine.ts,src/integration/proactive.ts,src/ui/chatSession.ts,src/ui/sessionManager.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ai/client.ts,src/ai/knowledge/index.ts,src/ai/compaction.ts,src/ai/modelLimits.ts
 ---
@@ -21,7 +21,7 @@ The current architecture has seven parts:
    This is the single bridge into live game state. It prefers `window.modAPI.getGameStateSnapshot()` and `window.modAPI.subscribe()`, then falls back to `window.gameStore` only if the official API is unavailable.
 
 2. `src/integration/contextEngine.ts`
-   This normalizes the raw snapshot into a `GameContext` object and builds the system prompt. The context engine extracts comprehensive game data including equipped item stats (via `modAPI.gameData.items` lookup), player physical/social stats, full combat stats during combat, inventory, techniques, quests, NPC relationships, and guild status. Game state is formatted with status-aware tiering so only relevant sections are included (e.g., stances during combat, crafting actions during crafting, NPCs during idle). The system prompt is assembled as a single consolidated block with no duplicated instructions.
+   This normalizes the raw snapshot into a `GameContext` object and builds the system prompt. The context engine extracts comprehensive game data including equipped item stats (via `modAPI.gameData.items` lookup), player physical/social stats, full combat stats during combat, inventory, techniques, quests, NPC relationships, guild status, and soul shard delve progress. Game state is formatted with status-aware tiering so only relevant sections are included (e.g., crafting actions during crafting, NPCs during idle). Stances are shown in combat and idle/event with slot fill counts (e.g. `[3/5]`) via `modAPI.utils.getTechniqueSlots()`. Translatable display names are resolved through `modAPI.utils.t()` when available. The system prompt is assembled as a single consolidated block with no duplicated instructions.
 
 3. `src/ai/knowledge/`
    Dynamic game knowledge system. Maintains compiled knowledge blocks for crafting, combat, cultivation, and stat formulas that are injected into prompts based on current game state. The selector uses budget-based `tryAdd()` to prioritize status-relevant knowledge first, then complementary blocks if budget allows.
@@ -40,7 +40,7 @@ The current architecture has seven parts:
 
 ## ModAPI-First Rules
 
-As of AFNM `0.6.50`, this mod should assume the following order of preference:
+As of AFNM `0.6.52`, this mod should assume the following order of preference:
 
 1. `window.modAPI.getGameStateSnapshot()` for read-only state.
 2. `window.modAPI.subscribe()` for reactive updates.
@@ -65,8 +65,8 @@ The repo currently adopts the new API in four places:
 
 Some new APIs are intentionally documented but not used by default yet:
 
-- `onReduxAction`
-  This runs inside the reducer. It is powerful but high-risk for a read-only advisor mod and should only be used when a concrete need cannot be met by `subscribe()` and snapshots.
+- `onReduxAction` / `onReduxActionPayload`
+  These run inside or before the reducer. They are powerful but high-risk for a read-only advisor mod and should only be used when a concrete need cannot be met by `subscribe()` and snapshots.
 
 - `onCalculateDamage`
   This is a mutation hook. It does not align with the mod's observer-first design unless the project explicitly adds opt-in gameplay mutators later.

@@ -3,8 +3,8 @@ title: Live Game Testing
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-06
-source_of_truth: scripts/installed-game-runtime.js + installed AFNM 0.6.50 runtime
+last_verified: 2026-04-27
+source_of_truth: scripts/installed-game-runtime.js + installed AFNM 0.6.52 runtime
 review_cycle_days: 21
 related_files: scripts/installed-game-runtime.js,package.json,scripts/ui/agent-browser-harness.tsx,docs/project/RELEASE_PROCESS.md
 ---
@@ -77,7 +77,7 @@ Why:
 Verified on April 6, 2026:
 
 - direct launch through `launch-native.sh --remote-debugging-port=9222` worked without Steam relaunch
-- the installed game re-extracted the new ElderGPT zip and logged mod metadata with `gameVersion: "0.6.50"`
+- the installed game re-extracted the new ElderGPT zip and logged mod metadata with the current game version
 - `agent-browser` smoke checks confirmed the floating toggle rendered, the panel opened, minimizing and reopening preserved chat state, and `error.log` stayed empty
 
 ## When To Use Each Path
