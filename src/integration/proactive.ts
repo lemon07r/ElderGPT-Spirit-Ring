@@ -206,12 +206,27 @@ function enqueue(trigger: ProactiveTrigger) {
   void processQueue();
 }
 
-function getEnemyNames(enemies: EnemyEntity[]): string[] {
-  return enemies.map((enemy) => enemy.name).filter(Boolean);
+function getEnemyNames(enemies: EnemyEntity[] | undefined): string[] {
+  return (enemies ?? []).map((enemy) => enemy?.name).filter(Boolean) as string[];
 }
 
-function getDroppedItemNames(droppedItems: Item[]): string[] {
-  return droppedItems.map((item) => item.name).filter(Boolean).slice(0, 4);
+function getDroppedItemNames(droppedItems: Item[] | undefined): string[] {
+  return (droppedItems ?? []).map((item) => item?.name).filter(Boolean).slice(0, 4) as string[];
+}
+
+// The game runs onComplete* hooks without a per-hook try/catch: a hook that
+// throws aborts the event advance before state commits, which makes combat
+// repeat endlessly. Every hook body must therefore be guarded so it can
+// never throw into the game.
+function guarded<Args extends unknown[], R>(fallback: R, fn: (...args: Args) => R): (...args: Args) => R {
+  return (...args: Args) => {
+    try {
+      return fn(...args);
+    } catch (error) {
+      console.warn(`${MOD_TAG} Hook callback failed; continuing without proactive trigger.`, error);
+      return fallback;
+    }
+  };
 }
 
 function getCraftedItemName(item: CraftingResult | undefined): string | null {
@@ -231,31 +246,31 @@ function registerActiveProactiveHooks() {
   unregisterProactiveHooks();
   hooksRegistered = true;
 
-  rememberUnsubscribe(hooks.onLocationEnter((locationId) => {
+  rememberUnsubscribe(hooks.onLocationEnter(guarded(undefined, (locationId) => {
     enqueue({
       kind: 'location-enter',
       locationId,
     });
-  }));
+  })));
 
-  rememberUnsubscribe(hooks.onAdvanceDay((days) => {
+  rememberUnsubscribe(hooks.onAdvanceDay(guarded(undefined, (days) => {
     if (days >= 7) {
       enqueue({
         kind: 'advance-day',
         days,
       });
     }
-  }));
+  })));
 
-  rememberUnsubscribe(hooks.onAdvanceMonth((month, year) => {
+  rememberUnsubscribe(hooks.onAdvanceMonth(guarded(undefined, (month, year) => {
     enqueue({
       kind: 'advance-month',
       month,
       year,
     });
-  }));
+  })));
 
-  rememberUnsubscribe(hooks.onCompleteCombat((_step, victory, _playerState, enemies, droppedItems) => {
+  rememberUnsubscribe(hooks.onCompleteCombat(guarded([], (_step, victory, _playerState, enemies, droppedItems) => {
     if (victory) {
       enqueue({
         kind: 'complete-combat',
@@ -265,9 +280,9 @@ function registerActiveProactiveHooks() {
     }
 
     return [];
-  }));
+  })));
 
-  rememberUnsubscribe(hooks.onCompleteCrafting((_step, item) => {
+  rememberUnsubscribe(hooks.onCompleteCrafting(guarded([], (_step, item) => {
     const itemName = getCraftedItemName(item);
     if (itemName) {
       enqueue({
@@ -277,25 +292,29 @@ function registerActiveProactiveHooks() {
     }
 
     return [];
-  }));
+  })));
 
   // AFNM 0.7 lifecycle hooks -----------------------------------------
 
-  rememberUnsubscribe(hooks.onLootDrop((items) => {
-    const names = items.map((i) => i.name).filter(Boolean).slice(0, 5);
+  rememberUnsubscribe(hooks.onLootDrop(guarded(undefined, (items) => {
+    const names = (items ?? []).map((i) => i?.name).filter(Boolean).slice(0, 5);
     if (names.length > 0) {
       enqueue({
         kind: 'loot-drop',
-        itemNames: names,
+        itemNames: names as string[],
       });
     }
-  }));
+  })));
 
   rememberUnsubscribe(hooks.onBeforeCombat((enemies, playerState, _flags) => {
-    enqueue({
-      kind: 'before-combat',
-      enemyNames: getEnemyNames(enemies),
-    });
+    try {
+      enqueue({
+        kind: 'before-combat',
+        enemyNames: getEnemyNames(enemies),
+      });
+    } catch (error) {
+      console.warn(`${MOD_TAG} Hook callback failed; continuing without proactive trigger.`, error);
+    }
 
     // Read-only advisor: return inputs unchanged.
     return { enemies, playerState };

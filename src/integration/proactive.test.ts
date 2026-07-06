@@ -170,6 +170,38 @@ describe("proactive hook lifecycle", () => {
     expect(enemies).toEqual([{ name: "Bandit" }]);
   });
 
+  it("never throws into the game even with malformed hook arguments", () => {
+    // A throwing onComplete* hook aborts the game's event advance and makes
+    // combat repeat endlessly, so callbacks must swallow all errors.
+    const hookApi = installWindowWithHooks();
+    updateSettings({
+      proactiveEnabled: true,
+      apiUrl: "http://localhost:1234/v1",
+      modelId: "local-model",
+    });
+    registerProactiveHooks();
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect(
+      hookApi.callbacks.onCompleteCombat!({ id: "step" }, true, undefined, undefined, undefined),
+    ).toEqual([]);
+    expect(
+      hookApi.callbacks.onCompleteCombat!({ id: "step" }, true, null, [null], [null]),
+    ).toEqual([]);
+    expect(
+      hookApi.callbacks.onCompleteCrafting!({ id: "step" }, { state: "perfect" }),
+    ).toEqual([]);
+    expect(hookApi.callbacks.onBeforeCombat!(undefined, undefined, undefined)).toEqual({
+      enemies: undefined,
+      playerState: undefined,
+    });
+    expect(() => hookApi.callbacks.onLootDrop!(undefined)).not.toThrow();
+    expect(() => hookApi.callbacks.onLootDrop!([null])).not.toThrow();
+    expect(() => hookApi.callbacks.onLocationEnter!(undefined)).not.toThrow();
+    expect(() => hookApi.callbacks.onAdvanceDay!(undefined)).not.toThrow();
+    expect(() => hookApi.callbacks.onAdvanceMonth!(undefined, undefined)).not.toThrow();
+  });
+
   it("keeps crafting completion callbacks read-only", () => {
     const hookApi = installWindowWithHooks();
     updateSettings({
