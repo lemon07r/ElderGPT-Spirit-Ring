@@ -1,7 +1,7 @@
 import type { CraftingResult, EnemyEntity, Item } from 'afnm-types';
 import { AIClient } from '../ai/client';
 import { selectKnowledge } from '../ai/knowledge';
-import { readSettingsSnapshot } from '../config/settings';
+import { readSettingsSnapshot, subscribeToSettings } from '../config/settings';
 import { appendAssistantMessage, readChatSessionSnapshot } from '../ui/chatSession';
 import { extractContext, getSystemPrompt } from './contextEngine';
 import { readGameStateSnapshot } from './gameState';
@@ -48,6 +48,8 @@ const MIN_PROACTIVE_INTERVAL_MS = 45_000;
 const queue: QueueEntry[] = [];
 
 let hooksRegistered = false;
+let lifecycleStarted = false;
+let unsubscribeSettings: (() => void) | undefined;
 let isProcessing = false;
 let lastProactiveAt = 0;
 
@@ -59,9 +61,16 @@ function rememberUnsubscribe(unsubscribe: unknown) {
 }
 
 export function unregisterProactiveHooks() {
+  if (typeof window === 'undefined') {
+    hooksRegistered = false;
+    queue.length = 0;
+    return;
+  }
+
   const unsubscribers = window.__elderGptHookUnsubscribers ?? [];
   window.__elderGptHookUnsubscribers = [];
   hooksRegistered = false;
+  queue.length = 0;
 
   for (const unsubscribe of unsubscribers) {
     try {
@@ -75,6 +84,14 @@ export function unregisterProactiveHooks() {
 function hasProactiveConfig() {
   const settings = readSettingsSnapshot();
   return Boolean(settings.proactiveEnabled && settings.apiUrl.trim() && settings.modelId.trim());
+}
+
+function hasUsableHookApi() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return Boolean(window.modAPI?.hooks);
 }
 
 function describeTrigger(trigger: ProactiveTrigger): string {
@@ -205,22 +222,23 @@ function getCraftedItemName(item: CraftingResult | undefined): string | null {
   return item.item.name;
 }
 
-export function registerProactiveHooks() {
-  if (hooksRegistered || !window.modAPI?.hooks) {
+function registerActiveProactiveHooks() {
+  const hooks = window.modAPI?.hooks;
+  if (hooksRegistered || !hooks) {
     return;
   }
 
   unregisterProactiveHooks();
   hooksRegistered = true;
 
-  rememberUnsubscribe(window.modAPI.hooks.onLocationEnter((locationId) => {
+  rememberUnsubscribe(hooks.onLocationEnter((locationId) => {
     enqueue({
       kind: 'location-enter',
       locationId,
     });
   }));
 
-  rememberUnsubscribe(window.modAPI.hooks.onAdvanceDay((days) => {
+  rememberUnsubscribe(hooks.onAdvanceDay((days) => {
     if (days >= 7) {
       enqueue({
         kind: 'advance-day',
@@ -229,7 +247,7 @@ export function registerProactiveHooks() {
     }
   }));
 
-  rememberUnsubscribe(window.modAPI.hooks.onAdvanceMonth((month, year) => {
+  rememberUnsubscribe(hooks.onAdvanceMonth((month, year) => {
     enqueue({
       kind: 'advance-month',
       month,
@@ -237,7 +255,7 @@ export function registerProactiveHooks() {
     });
   }));
 
-  rememberUnsubscribe(window.modAPI.hooks.onCompleteCombat((_step, victory, _playerState, enemies, droppedItems) => {
+  rememberUnsubscribe(hooks.onCompleteCombat((_step, victory, _playerState, enemies, droppedItems) => {
     if (victory) {
       enqueue({
         kind: 'complete-combat',
@@ -249,7 +267,7 @@ export function registerProactiveHooks() {
     return [];
   }));
 
-  rememberUnsubscribe(window.modAPI.hooks.onCompleteCrafting((_step, item) => {
+  rememberUnsubscribe(hooks.onCompleteCrafting((_step, item) => {
     const itemName = getCraftedItemName(item);
     if (itemName) {
       enqueue({
@@ -263,7 +281,7 @@ export function registerProactiveHooks() {
 
   // AFNM 0.7 lifecycle hooks -----------------------------------------
 
-  rememberUnsubscribe(window.modAPI.hooks.onLootDrop((items) => {
+  rememberUnsubscribe(hooks.onLootDrop((items) => {
     const names = items.map((i) => i.name).filter(Boolean).slice(0, 5);
     if (names.length > 0) {
       enqueue({
@@ -273,7 +291,7 @@ export function registerProactiveHooks() {
     }
   }));
 
-  rememberUnsubscribe(window.modAPI.hooks.onBeforeCombat((enemies, playerState, _flags) => {
+  rememberUnsubscribe(hooks.onBeforeCombat((enemies, playerState, _flags) => {
     enqueue({
       kind: 'before-combat',
       enemyNames: getEnemyNames(enemies),
@@ -283,3 +301,38 @@ export function registerProactiveHooks() {
     return { enemies, playerState };
   }));
 }
+
+export function syncProactiveHooks() {
+  if (hasProactiveConfig() && hasUsableHookApi()) {
+    registerActiveProactiveHooks();
+  } else {
+    unregisterProactiveHooks();
+  }
+}
+
+export function registerProactiveHooks() {
+  if (!lifecycleStarted) {
+    unsubscribeSettings = subscribeToSettings(syncProactiveHooks);
+    lifecycleStarted = true;
+  }
+
+  syncProactiveHooks();
+}
+
+export const __testing = {
+  get hooksRegistered() {
+    return hooksRegistered;
+  },
+  get lifecycleStarted() {
+    return lifecycleStarted;
+  },
+  reset() {
+    unsubscribeSettings?.();
+    unsubscribeSettings = undefined;
+    lifecycleStarted = false;
+    unregisterProactiveHooks();
+    isProcessing = false;
+    lastProactiveAt = 0;
+  },
+  syncProactiveHooks,
+};
