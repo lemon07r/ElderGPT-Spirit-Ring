@@ -3,7 +3,7 @@ title: Context Engine
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-27
+last_verified: 2026-07-06
 source_of_truth: src/integration/contextEngine.ts + src/integration/gameState.ts + src/ai/knowledge/
 review_cycle_days: 30
 related_files: src/integration/contextEngine.ts,src/integration/gameState.ts,src/ai/knowledge/index.ts,src/ai/knowledge/statFormulas.ts,src/ui/components/ChatPanel.tsx

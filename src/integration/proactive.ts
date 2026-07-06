@@ -51,6 +51,27 @@ let hooksRegistered = false;
 let isProcessing = false;
 let lastProactiveAt = 0;
 
+function rememberUnsubscribe(unsubscribe: unknown) {
+  if (typeof unsubscribe === 'function') {
+    window.__elderGptHookUnsubscribers ??= [];
+    window.__elderGptHookUnsubscribers.push(unsubscribe as () => void);
+  }
+}
+
+export function unregisterProactiveHooks() {
+  const unsubscribers = window.__elderGptHookUnsubscribers ?? [];
+  window.__elderGptHookUnsubscribers = [];
+  hooksRegistered = false;
+
+  for (const unsubscribe of unsubscribers) {
+    try {
+      unsubscribe();
+    } catch (error) {
+      console.warn(`${MOD_TAG} Failed to unregister proactive hook.`, error);
+    }
+  }
+}
+
 function hasProactiveConfig() {
   const settings = readSettingsSnapshot();
   return Boolean(settings.proactiveEnabled && settings.apiUrl.trim() && settings.modelId.trim());
@@ -189,33 +210,34 @@ export function registerProactiveHooks() {
     return;
   }
 
+  unregisterProactiveHooks();
   hooksRegistered = true;
 
-  window.modAPI.hooks.onLocationEnter((locationId) => {
+  rememberUnsubscribe(window.modAPI.hooks.onLocationEnter((locationId) => {
     enqueue({
       kind: 'location-enter',
       locationId,
     });
-  });
+  }));
 
-  window.modAPI.hooks.onAdvanceDay((days) => {
+  rememberUnsubscribe(window.modAPI.hooks.onAdvanceDay((days) => {
     if (days >= 7) {
       enqueue({
         kind: 'advance-day',
         days,
       });
     }
-  });
+  }));
 
-  window.modAPI.hooks.onAdvanceMonth((month, year) => {
+  rememberUnsubscribe(window.modAPI.hooks.onAdvanceMonth((month, year) => {
     enqueue({
       kind: 'advance-month',
       month,
       year,
     });
-  });
+  }));
 
-  window.modAPI.hooks.onCompleteCombat((_step, victory, _playerState, enemies, droppedItems) => {
+  rememberUnsubscribe(window.modAPI.hooks.onCompleteCombat((_step, victory, _playerState, enemies, droppedItems) => {
     if (victory) {
       enqueue({
         kind: 'complete-combat',
@@ -225,9 +247,9 @@ export function registerProactiveHooks() {
     }
 
     return [];
-  });
+  }));
 
-  window.modAPI.hooks.onCompleteCrafting((_step, item) => {
+  rememberUnsubscribe(window.modAPI.hooks.onCompleteCrafting((_step, item) => {
     const itemName = getCraftedItemName(item);
     if (itemName) {
       enqueue({
@@ -237,11 +259,11 @@ export function registerProactiveHooks() {
     }
 
     return [];
-  });
+  }));
 
-  // 0.6.50 hooks -------------------------------------------------------
+  // AFNM 0.7 lifecycle hooks -----------------------------------------
 
-  window.modAPI.hooks.onLootDrop((items) => {
+  rememberUnsubscribe(window.modAPI.hooks.onLootDrop((items) => {
     const names = items.map((i) => i.name).filter(Boolean).slice(0, 5);
     if (names.length > 0) {
       enqueue({
@@ -249,9 +271,9 @@ export function registerProactiveHooks() {
         itemNames: names,
       });
     }
-  });
+  }));
 
-  window.modAPI.hooks.onBeforeCombat((enemies, playerState, _flags) => {
+  rememberUnsubscribe(window.modAPI.hooks.onBeforeCombat((enemies, playerState, _flags) => {
     enqueue({
       kind: 'before-combat',
       enemyNames: getEnemyNames(enemies),
@@ -259,5 +281,5 @@ export function registerProactiveHooks() {
 
     // Read-only advisor: return inputs unchanged.
     return { enemies, playerState };
-  });
+  }));
 }

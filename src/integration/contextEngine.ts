@@ -1,4 +1,4 @@
-import type { CombatEntity, CombatStatsMap, Item, ItemDesc, Realm, RootState, Translatable } from 'afnm-types';
+import type { CombatStatsMap, CurrentCombatState, Item, ItemDesc, Realm, RootState, Translatable } from 'afnm-types';
 import { getGameStateSource, readGameStateSnapshot } from './gameState';
 
 // ---------------------------------------------------------------------------
@@ -27,6 +27,7 @@ interface CombatContext {
   playerMaxHp: number | null;
   playerStats: Record<string, number> | null;
   isSpar: boolean;
+  logEntries: number | null;
 }
 
 interface CraftingContext {
@@ -235,10 +236,47 @@ function extractSoulShardDelve(snapshot: RootState): SoulShardDelveContext | nul
 }
 
 function deriveStatus(snapshot: RootState): string {
-  if (snapshot.combat.playerState || snapshot.combat.player) return 'InCombat';
+  if (
+    snapshot.combat.playerState ||
+    snapshot.combat.player ||
+    (typeof window !== 'undefined' && window.modAPI?.combat?.isInCombat?.())
+  ) return 'InCombat';
   if (snapshot.crafting.progressState || snapshot.crafting.recipe) return 'Crafting';
   if (snapshot.gameEvent.gameEvent) return 'Event';
   return 'Idle';
+}
+
+function extractCombatContext(snapshot: RootState): CombatContext | null {
+  let runtimeCombat: CurrentCombatState | undefined;
+  let runtimeLogEntries: number | null = null;
+
+  try {
+    const combatApi = window.modAPI?.combat;
+    if (combatApi?.isInCombat?.()) {
+      runtimeCombat = combatApi.getCombatState?.();
+      runtimeLogEntries = combatApi.getCombatLog?.().length ?? null;
+    }
+  } catch {
+    runtimeCombat = undefined;
+  }
+
+  const snapshotHasCombat = Boolean(snapshot.combat.playerState || snapshot.combat.player);
+  const playerState = runtimeCombat?.playerState ?? snapshot.combat.playerState;
+  const enemies = runtimeCombat?.enemies ?? snapshot.combat.enemies;
+
+  if (!snapshotHasCombat && !runtimeCombat) {
+    return null;
+  }
+
+  return {
+    enemyNames: enemies.map((e) => asString(e.displayName, e.name)),
+    enemyCount: enemies.length,
+    playerHp: playerState?.stats?.hp ?? null,
+    playerMaxHp: playerState?.stats?.maxhp ?? null,
+    playerStats: playerState?.stats ? extractKeyStats(playerState.stats) : null,
+    isSpar: Boolean(runtimeCombat?.isSpar ?? snapshot.combat.isSpar),
+    logEntries: runtimeLogEntries,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -251,17 +289,7 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
   const itemDb = getItemDatabase();
   const p = snapshot.player.player;
 
-  const combat = snapshot.combat.playerState || snapshot.combat.player
-    ? {
-        enemyNames: snapshot.combat.enemies.map((e) => asString(e.displayName, e.name)),
-        enemyCount: snapshot.combat.enemies.length,
-        playerHp: snapshot.combat.playerState?.stats?.hp ?? null,
-        playerMaxHp: snapshot.combat.playerState?.stats?.maxhp ?? null,
-        playerStats: snapshot.combat.playerState?.stats
-          ? extractKeyStats(snapshot.combat.playerState.stats) : null,
-        isSpar: Boolean(snapshot.combat.isSpar),
-      }
-    : null;
+  const combat = extractCombatContext(snapshot);
 
   const craftingTeamUp = snapshot.gameEvent.craftingTeamUpOverride;
   const craftingPlayer = snapshot.crafting.player;
@@ -457,6 +485,7 @@ function formatCombat(combat: CombatContext): string {
   }
   const sl = kvLine(combat.playerStats, 'Stats');
   if (sl) lines.push(sl);
+  if (combat.logEntries !== null) lines.push(`Combat log entries: ${combat.logEntries}`);
   return lines.join('\n');
 }
 

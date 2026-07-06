@@ -19,13 +19,13 @@ export function registerModApiUiHooks() {
 
   window.__elderGptUiHooksRegistered = true;
 
-  window.modAPI.injectUI('combat-victory', (api, _element, inject) =>
+  window.modAPI.injectUI('combat-victory', (api, inject) =>
     inject(
       '[aria-live="assertive"]',
       <api.components.GameButton onClick={openSpiritRing}>
         Consult Spirit Ring
       </api.components.GameButton>,
-      'inline',
+      'after',
     ),
   );
 }

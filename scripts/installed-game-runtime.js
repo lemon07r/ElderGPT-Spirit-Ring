@@ -123,7 +123,7 @@ function extractSummary(extractDir, gameDir, asarPath) {
       ),
       hasInjectUI: hasToken(gameJs, 'injectUI:'),
       hasSubscribe: hasToken(gameJs, 'subscribe:e=>'),
-      hasGetGameStateSnapshot: hasToken(gameJs, 'getGameStateSnapshot:()=>window.gameStore?.getState()??null'),
+      hasGetGameStateSnapshot: hasToken(gameJs, 'getGameStateSnapshot:'),
       hasOnEventDropItem: hasToken(gameJs, 'onEventDropItem'),
       hasOnGenerateExploreEvents: hasToken(gameJs, 'onGenerateExploreEvents'),
       hasOnCalculateDamage: hasToken(gameJs, 'onCalculateDamage'),

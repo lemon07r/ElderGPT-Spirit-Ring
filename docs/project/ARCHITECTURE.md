@@ -3,8 +3,8 @@ title: Mod Architecture
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-27
-source_of_truth: src/integration, src/ui, src/ai, src/config, live AFNM 0.6.52 runtime
+last_verified: 2026-07-06
+source_of_truth: src/integration, src/ui, src/ai, src/config, installed AFNM runtime
 review_cycle_days: 30
 related_files: src/integration/index.ts,src/integration/gameState.ts,src/integration/contextEngine.ts,src/integration/proactive.ts,src/ui/chatSession.ts,src/ui/sessionManager.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ai/client.ts,src/ai/knowledge/index.ts,src/ai/compaction.ts,src/ai/modelLimits.ts
 ---
@@ -40,7 +40,7 @@ The current architecture has seven parts:
 
 ## ModAPI-First Rules
 
-As of AFNM `0.6.52`, this mod should assume the following order of preference:
+For AFNM `0.7.x`, this mod should assume the following order of preference:
 
 1. `window.modAPI.getGameStateSnapshot()` for read-only state.
 2. `window.modAPI.subscribe()` for reactive updates.
@@ -54,7 +54,7 @@ Reverse-engineering should be centralized and justified. Do not reintroduce ad h
 
 The repo currently adopts the new API in four places:
 
-- Context extraction now runs from the official live snapshot first.
+- Context extraction now runs from the official live snapshot first and supplements active combat reads from the read-only parts of `modAPI.combat` when available.
 - The chat header reacts to live state through the official subscription path.
 - A `combat-victory` inline CTA is injected through `injectUI()` to open the chat from a real game dialog.
 - Proactive suggestions now use official lifecycle hooks for location entry, month rollover, long day advances, combat completion, crafting completion, loot drops, and pre-combat advice.

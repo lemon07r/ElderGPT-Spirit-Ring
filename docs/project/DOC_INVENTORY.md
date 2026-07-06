@@ -3,7 +3,7 @@ title: Documentation Inventory
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-04-27
+last_verified: 2026-07-06
 source_of_truth: repository markdown file inventory
 review_cycle_days: 30
 related_files: AGENTS.md,docs/reference/AFNM_MODDING.md,scripts/docs/generate-inventory.js
@@ -35,7 +35,6 @@ Generated on: 2026-04-27
 | `docs/project/CONTEXT_ENGINE.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 | `docs/project/DOC_INVENTORY.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 | `docs/project/LIVE_GAME_TESTING.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
-| `docs/project/MODAPI_0_6_49_AUDIT.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 | `docs/project/RELEASE_PROCESS.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 | `docs/project/UI_ARCHITECTURE.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 

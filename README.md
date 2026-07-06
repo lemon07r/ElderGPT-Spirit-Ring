@@ -12,7 +12,7 @@
   <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3701616500">
     <img src="https://img.shields.io/badge/Steam_Workshop-Subscribe-1b2838?logo=steam&logoColor=white" alt="Steam Workshop" />
   </a>
-  <img src="https://img.shields.io/badge/AFNM-0.6.50+-blue" alt="Game Version" />
+  <img src="https://img.shields.io/badge/AFNM-0.7.x-blue" alt="Game Version" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
 
@@ -180,7 +180,7 @@ src/
 └──────────────────────────────────────────────────────────────┘
 ```
 
-The mod follows a strict **modAPI-first** policy (as of AFNM `0.6.50`):
+The mod follows a strict **modAPI-first** policy for AFNM `0.7.x`:
 
 1. `window.modAPI.getGameStateSnapshot()` for read-only state
 2. `window.modAPI.subscribe()` for reactive updates

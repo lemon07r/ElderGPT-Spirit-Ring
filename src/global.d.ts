@@ -14,6 +14,7 @@ declare global {
     MaterialUIIcons?: any;
     __elderGptInstalled?: boolean;
     __elderGptUiHooksRegistered?: boolean;
+    __elderGptHookUnsubscribers?: Array<() => void>;
   }
 }
 
