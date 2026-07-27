@@ -1,33 +1,19 @@
 export const CULTIVATION_KNOWLEDGE = `\
-=== CULTIVATION & PROGRESSION ===
+=== CULTIVATION & PROGRESSION (AFNM 0.7.6) ===
 
-TEN CULTIVATION REALMS (ascending order):
-1. Mundane - Starting point, no cultivation abilities
-2. Body Forging - Physical conditioning, basic combat, limited crafting
-3. Meridian Opening - Qi channels open, elemental Flames available, condition-dependent crafting actions
-4. Qi Condensation - Major milestone: Sublime Crafting unlocks at 200 Craft Skill. Harmony minigames activate. Heavy buff layering begins.
-5. Core Formation - Advanced sub-systems unlock: Insight, Focus, Pressure, Golden Path. 67+ crafting actions available. Highly specialized builds.
-6. Pillar Creation - Pillar shards become relevant, expanded technique mastery
-7. Life Flourishing - Advanced cultivation arts, stronger techniques
-8. World Shaping - Near-peak power, complex enemy encounters
-9. Inner Genesis - Approaching ascension, extreme difficulty scaling
-10. Soul Ascension - Final realm, highest difficulty (9x multiplier)
+The cultivation realms ascend from Mundane through Body Forging, Meridian
+Opening, Qi Condensation, Core Formation, Pillar Creation, Life Flourishing,
+World Shaping, Inner Genesis, and Soul Ascension. Realm and realm-progress gates
+affect available content, techniques, crafting, and enemies.
 
-Each realm has Early/Mid/Late progress stages affecting stat scaling and available content.
+Research has a material queue. Only the frontmost entry with recipes remaining
+accrues progress; formation glyph harmonies multiply research speed. Use the
+live queue, progress, discovered recipes, and glyph list.
 
-REALM PROGRESSION:
-- Breakthroughs require specific items, stats, and conditions
-- Breakthrough pills help with advancement
-- Higher realms unlock more locations, enemies, recipes, and techniques
-- Difficulty scales exponentially: realm multiplier from 0.9 (mundane) to 9.0 (soul ascension)
+Soul-shard delves use a selected delve key, an ordered run of nodes plus a boss,
+room/stage indexes, qither progress, blessings/curses, pending rewards, and
+per-delve progression. They do not use a floor/max-floor model.
 
-GENERAL STRATEGY:
-- Balance combat training with crafting skill development
-- Craft pills and equipment before attempting difficult fights
-- Explore new locations for events, resources, and quest opportunities
-- Build NPC relationships for crafting companions and combat allies
-- Manage money and favour for sect resources
-- Time matters: some events are calendar-gated, NPC trades rotate monthly
-- Guild tasks refresh monthly (seeded by year+month)
-- Mine chambers and mystical regions offer unique rewards
-- Explore events use a pity system: rarer tiers become more likely after dry streaks`;
+Calendar, quests, relationships, guilds, expeditions, mines, mystical regions,
+formations, inventory, and equipment all contribute to progression. Prefer the
+live context over generic unlock assumptions.`;

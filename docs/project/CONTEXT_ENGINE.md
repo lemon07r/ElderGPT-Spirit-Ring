@@ -3,7 +3,7 @@ title: Context Engine
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-07-06
+last_verified: 2026-07-27
 source_of_truth: src/integration/contextEngine.ts + src/integration/gameState.ts + src/ai/knowledge/
 review_cycle_days: 30
 related_files: src/integration/contextEngine.ts,src/integration/gameState.ts,src/ai/knowledge/index.ts,src/ai/knowledge/statFormulas.ts,src/ui/components/ChatPanel.tsx
@@ -27,11 +27,27 @@ The `GameContext` payload includes:
 
 - **Core identity** (always present): source, status, screen, location, player name/realm/progress, HP, Qi, droplets, money, favour, injury, party size, calendar, physical stats, social stats, elemental affinities, reputation.
 
-- **Equipment** (always present): each equipped item (clothing, talismans, artefacts, mount, cauldron, flame) is cross-referenced against `modAPI.gameData.items` to resolve full stats (defense, dr, power, buffs, etc.), enchantment, quality tier, rarity, and realm.
+- **Equipment** (always present): descriptors are resolved with
+  `modAPI.utils.getFullItem()` and include crafting `stats`, combat
+  `combatStats`, root stats, buffs, enchantment, rarity/realm, and
+  `harmonyAugment.type`/`quality`.
 
 - **Combat** (when in combat): enemy names/count, player HP/maxHP, full `CombatStatsMap` (power, defense, dr, barrier, critchance, school boosts/resistances, etc.), spar state.
 
-- **Crafting** (when crafting): recipe name, completion/perfection/stability/harmony, condition, step, consumed pills, recommended techniques, companion, full crafting stats (pool, control, intensity, etc.).
+- **Crafting** (when crafting): recipe and bars, selected harmony,
+  harmony-specific state, complexity multiplier, native crafting auto-use
+  slots, companion, recommendations, and full crafting stats.
+
+- **Research**: current material queue, remaining/discovered recipes, progress,
+  material-return state, and installed harmony glyphs.
+
+- **Core Formation altars**: beaten altar names plus the aggregated combat and
+  crafting reward scalings returned by
+  `modAPI.actions.getCoreFormationAltarStats()`.
+
+- **Soul-shard delve**: selected delve, ordered-run room/stage indexes, qither,
+  difficulty, blessings/curses/rewards, and per-delve progression. The removed
+  floor/max-floor assumption is not used.
 
 - **Inventory**: item names and stack counts (up to 50 items).
 
@@ -76,6 +92,7 @@ The game state is formatted with status-aware section inclusion to avoid filling
 | Stances (with slot counts) | Yes | No | Yes |
 | Crafting actions | No | Yes | No |
 | Inventory | Always | Always | Always |
+| Core Formation altars | When available | When available | When available |
 | Quests | No | No | Yes |
 | NPCs | No | No | Yes |
 | Reputation & Guild | Always | Always | Always |

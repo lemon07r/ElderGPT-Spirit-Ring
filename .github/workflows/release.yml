@@ -22,17 +22,17 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
-      - name: Build mod
-        run: bun run build
+      - name: Validate release
+        run: bun run release:validate:ci
 
       - name: Get version from tag
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: ElderGPT Spirit Ring v${{ steps.get_version.outputs.VERSION }}
           draft: false

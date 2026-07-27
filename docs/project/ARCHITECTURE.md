@@ -3,7 +3,7 @@ title: Mod Architecture
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-07-06
+last_verified: 2026-07-27
 source_of_truth: src/integration, src/ui, src/ai, src/config, installed AFNM runtime
 review_cycle_days: 30
 related_files: src/integration/index.ts,src/integration/gameState.ts,src/integration/contextEngine.ts,src/integration/proactive.ts,src/ui/chatSession.ts,src/ui/sessionManager.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ai/client.ts,src/ai/knowledge/index.ts,src/ai/compaction.ts,src/ai/modelLimits.ts
@@ -20,8 +20,13 @@ The current architecture has seven parts:
 1. `src/integration/gameState.ts`
    This is the single bridge into live game state. It prefers `window.modAPI.getGameStateSnapshot()` and `window.modAPI.subscribe()`, then falls back to `window.gameStore` only if the official API is unavailable.
 
-2. `src/integration/contextEngine.ts`
-   This normalizes the raw snapshot into a `GameContext` object and builds the system prompt. The context engine extracts comprehensive game data including equipped item stats (via `modAPI.gameData.items` lookup), player physical/social stats, full combat stats during combat, inventory, techniques, quests, NPC relationships, guild status, and soul shard delve progress. Game state is formatted with status-aware tiering so only relevant sections are included (e.g., crafting actions during crafting, NPCs during idle). Stances are shown in combat and idle/event with slot fill counts (e.g. `[3/5]`) via `modAPI.utils.getTechniqueSlots()`. Translatable display names are resolved through `modAPI.utils.t()` when available. The system prompt is assembled as a single consolidated block with no duplicated instructions.
+2. `src/integration/contextEngine.ts` and domain adapters
+   These normalize the raw snapshot into `GameContext`. Equipment is resolved
+   through `utils.getFullItem()` so enchantments and harmony augments are
+   reflected; dedicated adapters normalize equipment and the 0.7.6 soul-shard
+   run/progression shape. Crafting context includes the selected harmony,
+   harmony state, complexity, and native crafting auto-use slots. Research queue
+   return/glyph state and Core Formation altar aggregates are also exposed.
 
 3. `src/ai/knowledge/`
    Dynamic game knowledge system. Maintains compiled knowledge blocks for crafting, combat, cultivation, and stat formulas that are injected into prompts based on current game state. The selector uses budget-based `tryAdd()` to prioritize status-relevant knowledge first, then complementary blocks if budget allows.
