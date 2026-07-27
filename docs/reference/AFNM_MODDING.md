@@ -3,8 +3,8 @@ title: AFNM Modding Reference
 status: active
 authoritative: false
 owner: eldergpt-maintainers
-last_verified: 2026-07-06
-source_of_truth: installed AFNM runtime + afnm-types 0.7.0 + official AFNM docs site + AfnmExampleMod repo
+last_verified: 2026-07-27
+source_of_truth: installed AFNM 0.7.6-7c586da runtime + afnm-types 0.7.6
 review_cycle_days: 45
 related_files: scripts/installed-game-runtime.js,AGENTS.md
 ---

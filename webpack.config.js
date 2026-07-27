@@ -1,6 +1,6 @@
 const path = require('path');
-const package = require('./package.json');
 const webpack = require('webpack');
+const { packageJson, buildMetadata } = require('./scripts/mod-package');
 
 const isProduction =
   process.env.NODE_ENV === 'production' ||
@@ -59,7 +59,7 @@ module.exports = {
   },
   output: {
     filename: 'mod.js',
-    path: path.resolve(__dirname, `dist/${package.name}`),
+    path: path.resolve(__dirname, `dist/${packageJson.name}`),
     library: {
       name: 'AFNMMod',
       type: 'umd',
@@ -70,13 +70,8 @@ module.exports = {
   },
   plugins: [
     new webpack.DefinePlugin({
-      MOD_METADATA: JSON.stringify({
-        name: package.name,
-        version: package.version,
-        author: package.author,
-        description: package.description,
-      }),
-      MOD_VERSION: JSON.stringify(package.version),
+      MOD_METADATA: `(${JSON.stringify(buildMetadata())})`,
+      MOD_VERSION: JSON.stringify(packageJson.version),
     }),
   ],
 };

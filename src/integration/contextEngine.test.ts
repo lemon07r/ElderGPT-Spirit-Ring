@@ -1,4 +1,4 @@
-import type { RootState } from 'afnm-types';
+import type { ModAPI, RootState } from 'afnm-types';
 import { extractContext } from './contextEngine';
 
 function createSnapshot(overrides: Partial<RootState> = {}): RootState {
@@ -156,7 +156,7 @@ function createSnapshot(overrides: Partial<RootState> = {}): RootState {
       mineViewport: undefined,
     },
     version: {
-      version: '0.6.49',
+      version: '0.7.6',
     },
     selectedCharacter: {
       selectedCharacter: undefined,
@@ -411,5 +411,55 @@ describe('extractContext', () => {
         recommendedTechniqueTypes: ['fusion'],
       }),
     );
+  });
+
+  it('includes 0.7.6 Core Formation altar aggregates and research return state', () => {
+    (globalThis as typeof globalThis & { window: Window }).window = {
+      modAPI: {
+        actions: {
+          getCoreFormationAltarStats: jest.fn(() => ({
+            combatStats: {
+              power: { value: 0.1, stat: 'power' },
+            },
+            craftingStats: {},
+            altarContributions: [],
+          })),
+        },
+      } as unknown as ModAPI,
+    } as Window;
+
+    try {
+      const snapshot = createSnapshot({
+        breakthrough: {
+          coreFormation: {
+            beatenAltars: ['Burning Core'],
+          },
+        } as RootState['breakthrough'],
+        research: {
+          queue: [{
+            material: 'Spirit Iron',
+            remaining: ['Spirit Blade'],
+            discovered: [],
+            materialReturned: true,
+            progress: 2,
+          }],
+          glyphs: [],
+        },
+      });
+
+      const context = extractContext(snapshot);
+
+      expect(context.coreFormationAltars).toEqual(
+        expect.objectContaining({
+          beatenAltars: ['Burning Core'],
+          combatStats: {
+            power: { value: 0.1, stat: 'power' },
+          },
+        }),
+      );
+      expect(context.research.queue[0]?.materialReturned).toBe(true);
+    } finally {
+      delete (globalThis as Partial<{ window: Window }>).window;
+    }
   });
 });

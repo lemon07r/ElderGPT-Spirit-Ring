@@ -12,7 +12,7 @@
   <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3701616500">
     <img src="https://img.shields.io/badge/Steam_Workshop-Subscribe-1b2838?logo=steam&logoColor=white" alt="Steam Workshop" />
   </a>
-  <img src="https://img.shields.io/badge/AFNM-0.7.x-blue" alt="Game Version" />
+  <img src="https://img.shields.io/badge/AFNM-0.7.6-blue" alt="Game Version" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
 
@@ -26,7 +26,9 @@ It is **read-only by design**: it does not automate combat, spend resources, or 
 
 - 💬 **Persistent chat with sessions** — conversations are saved automatically. Switch between chats, start new ones, or pick up where you left off.
 - 🧠 **Deep game knowledge** — the AI is fed relevant crafting, combat, and cultivation knowledge based on your current activity, distilled from comprehensive game mechanics documentation.
-- 🎯 **Live context** — advice is grounded in your current run (realm, HP, location, combat state, crafting progress), not a generic wiki answer.
+- 🎯 **Live 0.7.6 context** — advice includes resolved harmony-augmented
+  equipment, selected crafting harmony/state, crafting auto-use, research,
+  Core Formation altar rewards, and soul-shard delve progression.
 - 📊 **Smart context management** — automatically detects your model's context window and compacts long conversations so the AI never loses track.
 - ⚡ **Streaming responses** — see words as the AI responds, with markdown formatting and a loading animation.
 - 🔔 **Proactive hints** — optional post-event suggestions after combat victories, travel, crafting completions, and time skips.

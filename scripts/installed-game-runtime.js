@@ -77,10 +77,18 @@ function extractSummary(extractDir, gameDir, asarPath) {
   const packageJsonPath = path.join(extractDir, 'package.json');
   const mainIndexPath = path.join(extractDir, 'dist-electron', 'main', 'index.js');
   const gameJsPath = path.join(extractDir, 'dist-electron', 'Game.js');
+  const dynamicImportHelperPath = path.join(
+    extractDir,
+    'dist-electron',
+    '_rolldown_dynamic_import_helper.js',
+  );
 
   const packageJson = readJson(packageJsonPath);
   const mainIndex = readText(mainIndexPath);
   const gameJs = readText(gameJsPath);
+  const rendererJs = fs.existsSync(dynamicImportHelperPath)
+    ? `${gameJs}\n${readText(dynamicImportHelperPath)}`
+    : gameJs;
 
   const buildVersion = mainIndex.match(/const ce="([^"]+)"/)?.[1] ?? null;
   const forgeLowPenalty =
@@ -112,7 +120,7 @@ function extractSummary(extractDir, gameDir, asarPath) {
     },
     modApi: {
       hasHarmonyConfigs: gameJs.includes('harmonyConfigs'),
-      hasItemTypeToHarmonyType: gameJs.includes('itemTypeToHarmonyType'),
+      hasRemovedItemHarmonyMapping: !gameJs.includes('itemTypeToHarmonyType'),
       hasRecipeConditionEffects: gameJs.includes('recipeConditionEffects'),
       hasCraftingTechniques: gameJs.includes('craftingTechniques'),
       hasGetVariablesFromCraftingEntity: gameJs.includes(
@@ -133,6 +141,24 @@ function extractSummary(extractDir, gameDir, asarPath) {
       hasOnAdvanceMonth: hasToken(gameJs, 'onAdvanceMonth'),
       hasOnBeforeCombat: hasToken(gameJs, 'onBeforeCombat'),
       hasOnReduxAction: hasToken(gameJs, 'onReduxAction'),
+      hasHarmonyAugment: gameJs.includes('harmonyAugment'),
+      hasGetFullItem: gameJs.includes('getFullItem'),
+      hasCraftingAutoUse: gameJs.includes('currentCraftingAutoUseLoadout'),
+      hasResearchState:
+        gameJs.includes('research') && gameJs.includes('glyphs'),
+      hasSoulShardDelveRun: gameJs.includes('soulShardDelve'),
+      hasExpeditionTiles: gameJs.includes('expeditionTiles'),
+      hasMysticalRegionDefinitions: gameJs.includes(
+        'mysticalRegionDefinitions',
+      ),
+      hasBuffStatFilter:
+        rendererJs.includes('interceptBuffEffects') &&
+        rendererJs.includes('statFilter'),
+      hasGlobalBuffRegistry:
+        /techniques:[^,]{1,100},buffs:[^,]{1,100},techniqueBuffs:/.test(gameJs),
+      hasCoreFormationAltarStats: gameJs.includes(
+        'getCoreFormationAltarStats',
+      ),
     },
   };
 }

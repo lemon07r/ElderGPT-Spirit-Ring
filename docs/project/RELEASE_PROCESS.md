@@ -3,7 +3,7 @@ title: Release Process
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-07-06
+last_verified: 2026-07-27
 source_of_truth: package.json,scripts/workshop-upload.ts,.github/workflows/release.yml,../ModUploader-AFNM/electron/main/cli.ts
 review_cycle_days: 30
 related_files: package.json,scripts/workshop-upload.ts,docs/project/LIVE_GAME_TESTING.md,.github/workflows/release.yml,AGENTS.md
@@ -18,6 +18,7 @@ Use this sequence when preparing a real release.
 Run:
 
 ```bash
+bun install --frozen-lockfile
 bun run release:validate
 ```
 
@@ -115,7 +116,7 @@ Use conventional commits:
 If you are working from a real git checkout:
 
 ```bash
-git add package.json package-lock.json src docs scripts .github AGENTS.md
+git add package.json bun.lock src docs scripts .github AGENTS.md
 git commit -m "chore(release): vX.Y.Z"
 git push origin main
 git tag vX.Y.Z

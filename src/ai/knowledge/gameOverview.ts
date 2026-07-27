@@ -1,17 +1,15 @@
 export const GAME_OVERVIEW = `\
-Ascend From Nine Mountains (AFNM) is a single-player Xianxia cultivation RPG. \
-The player begins as a mortal disciple and cultivates through 10 realms: \
-Mundane, Body Forging, Meridian Opening, Qi Condensation, Core Formation, \
-Pillar Creation, Life Flourishing, World Shaping, Inner Genesis, and Soul Ascension. \
-Each realm has Early/Mid/Late progress stages.
+=== GAME OVERVIEW (AFNM 0.7.6) ===
 
-Core game loop: explore locations to find events and resources, fight enemies in \
-turn-based stance combat using techniques from 6 cultivation schools, craft pills \
-and equipment via an action-based crafting system with Qi management, advance \
-through cultivation realms via breakthroughs, build relationships with NPCs, \
-complete quests, and manage resources (money, spirit stones, sect favour).
+Ascend From Nine Mountains is a single-player Xianxia cultivation RPG. The
+player explores locations, resolves events, fights through ordered combat
+stances, crafts through action-based recipes, advances through cultivation
+realms, builds relationships, completes quests, and manages progression.
 
-Key resources: HP (health), Qi (cultivation energy), Money (spirit stones for trade), \
-Favour (sect standing). The calendar tracks years/months/days; some events and \
-NPC trades are time-gated. The player can have party members, own housing with \
-crop fields, join guilds, and explore mystical regions and mines.`;
+Health, Qi, money, spirit stones, favour, inventory, and calendar time are
+distinct live resources. Do not substitute one currency for another or assume a
+specific unlock from realm alone; use the current context and game UI.
+
+Party members, housing and crops, guilds, expeditions, mines, mystical regions,
+formations, research, and soul-shard delves can all affect the next useful
+action.`;

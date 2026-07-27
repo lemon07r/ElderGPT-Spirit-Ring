@@ -1,100 +1,27 @@
-import type { CombatStatsMap, CurrentCombatState, Item, ItemDesc, Realm, RootState, Translatable } from 'afnm-types';
+import type {
+  CombatStatsMap,
+  CurrentCombatState,
+  Item,
+  ItemDesc,
+  Realm,
+  RecipeHarmonyType,
+  RootState,
+  Translatable,
+} from 'afnm-types';
 import { getGameStateSource, readGameStateSnapshot } from './gameState';
+import type {
+  CombatContext,
+  CraftingContext,
+  CoreFormationAltarContext,
+  EquipmentPiece,
+  EventSummaryContext,
+  GameContext,
+  InventoryEntry,
+} from './contextTypes';
+import { buildEquipmentPiece } from './equipmentContext';
+import { extractSoulShardDelve } from './delveContext';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface EquipmentPiece {
-  slot: string;
-  name: string;
-  enchantment: string | null;
-  qualityTier: number | null;
-  stats: Record<string, number> | null;
-  buffs: string[];
-  extras: Record<string, string | number>;
-}
-
-interface InventoryEntry {
-  name: string;
-  stacks: number;
-}
-
-interface CombatContext {
-  enemyNames: string[];
-  enemyCount: number;
-  playerHp: number | null;
-  playerMaxHp: number | null;
-  playerStats: Record<string, number> | null;
-  isSpar: boolean;
-  logEntries: number | null;
-}
-
-interface CraftingContext {
-  recipe: string | null;
-  completion: number | null;
-  perfection: number | null;
-  stability: number | null;
-  harmony: number | null;
-  condition: string | null;
-  step: number | null;
-  consumedPills: number;
-  recommendedTechniqueTypes: string[];
-  companion: string | null;
-  playerStats: Record<string, number> | null;
-}
-
-interface EventSummaryContext {
-  year: number;
-  month: number;
-  day: number;
-  texts: string[];
-}
-
-interface SoulShardDelveContext {
-  floor: number;
-  maxFloor: number;
-}
-
-export interface GameContext {
-  source: ReturnType<typeof getGameStateSource>;
-  status: string;
-  screen: string;
-  location: string;
-  autoBattle: boolean | null;
-  player: {
-    name: string;
-    realm: string | null;
-    realmProgress: string | null;
-    hp: number | null;
-    qi: number | null;
-    qiDroplets: number | null;
-    money: number | null;
-    favour: number | null;
-    injured: boolean;
-    partySize: number;
-    physicalStats: Record<string, number> | null;
-    socialStats: Record<string, number> | null;
-    affinities: Record<string, number> | null;
-    reputation: Record<string, number> | null;
-  };
-  maxTechniqueSlots: number | null;
-  equipment: EquipmentPiece[];
-  inventory: InventoryEntry[];
-  techniques: string[];
-  craftingActions: string[];
-  stances: { name: string; techniques: string[] }[];
-  quests: { name: string; completedSteps: number; totalSteps: number }[];
-  characters: { name: string; approval: number; relationship: string | null; isFollowing: boolean }[];
-  guild: { name: string; rank: number; approval: number } | null;
-  calendar: { year: number | null; month: number | null; day: number | null };
-  activeEvent: boolean;
-  flagCount: number;
-  combat: CombatContext | null;
-  crafting: CraftingContext | null;
-  soulShardDelve: SoulShardDelveContext | null;
-  recentEvents: EventSummaryContext[];
-}
+export type { GameContext } from './contextTypes';
 
 // ---------------------------------------------------------------------------
 // Defaults
@@ -117,6 +44,8 @@ const DEFAULT_CONTEXT: GameContext = {
   stances: [], quests: [], characters: [], guild: null,
   calendar: { year: null, month: null, day: null },
   activeEvent: false, flagCount: 0, combat: null, crafting: null,
+  research: { queue: [], glyphs: [] },
+  coreFormationAltars: null,
   soulShardDelve: null, recentEvents: [],
 };
 
@@ -143,7 +72,7 @@ function getDisplayLocation(snapshot: RootState): string {
   const locationId = snapshot.location.current;
   if (!locationId) return DEFAULT_CONTEXT.location;
   const displayName = typeof window === 'undefined'
-    ? undefined : window.modAPI?.gameData.locations?.[locationId]?.displayName;
+    ? undefined : window.modAPI?.gameData?.locations?.[locationId]?.displayName;
   return asString(displayName, locationId);
 }
 
@@ -163,40 +92,6 @@ function nonZeroMap(src: Record<string, number> | null | undefined): Record<stri
 function getItemDatabase(): Record<string, Item> | null {
   if (typeof window === 'undefined') return null;
   return window.modAPI?.gameData?.items ?? null;
-}
-
-function extractItemStats(item: Item): Record<string, number> | null {
-  const stats = (item as { stats?: Record<string, unknown> }).stats;
-  if (!stats) return null;
-  return nonZeroMap(stats as Record<string, number>);
-}
-
-function extractBuffNames(item: Item): string[] {
-  const buffs = (item as { buffs?: Array<{ buff: { name: string } }> }).buffs;
-  if (!buffs || !Array.isArray(buffs)) return [];
-  return buffs.map((b) => asString(b.buff?.name, '')).filter(Boolean);
-}
-
-function buildEquipmentPiece(slot: string, desc: ItemDesc | undefined, db: Record<string, Item> | null): EquipmentPiece | null {
-  if (!desc?.name) return null;
-  const full = db?.[desc.name] ?? null;
-  const extras: Record<string, string | number> = {};
-  if (full) {
-    for (const k of ['charisma', 'qiAbsorption', 'speed', 'qi', 'masteryPoints'] as const) {
-      const v = (full as unknown as Record<string, unknown>)[k];
-      if (typeof v === 'number' && v !== 0) extras[k] = v;
-    }
-    if (full.rarity) extras.rarity = full.rarity;
-    if (full.realm && full.realm !== 'any') extras.realm = full.realm;
-  }
-  return {
-    slot, name: desc.name,
-    enchantment: desc.enchantment?.kind ?? null,
-    qualityTier: desc.qualityTier ?? null,
-    stats: full ? extractItemStats(full) : null,
-    buffs: full ? extractBuffNames(full) : [],
-    extras,
-  };
 }
 
 const COMBAT_STAT_KEYS: (keyof CombatStatsMap)[] = [
@@ -226,13 +121,23 @@ function getTechniqueSlots(realm: string | null | undefined): number | null {
   return null;
 }
 
-function extractSoulShardDelve(snapshot: RootState): SoulShardDelveContext | null {
-  const delve = snapshot.soulShardDelve;
-  if (!delve || typeof delve !== 'object') return null;
-  const floor = (delve as { currentFloor?: number }).currentFloor;
-  const maxFloor = (delve as { maxFloor?: number }).maxFloor;
-  if (typeof floor !== 'number') return null;
-  return { floor, maxFloor: typeof maxFloor === 'number' ? maxFloor : floor };
+function extractCoreFormationAltars(
+  snapshot: RootState,
+): CoreFormationAltarContext | null {
+  const beatenAltars = snapshot.breakthrough.coreFormation?.beatenAltars ?? [];
+  if (beatenAltars.length === 0 || typeof window === 'undefined') return null;
+
+  const aggregate = window.modAPI?.actions?.getCoreFormationAltarStats;
+  if (!aggregate) return null;
+
+  try {
+    return {
+      beatenAltars: [...beatenAltars],
+      ...aggregate(snapshot.breakthrough),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function deriveStatus(snapshot: RootState): string {
@@ -293,6 +198,13 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
 
   const craftingTeamUp = snapshot.gameEvent.craftingTeamUpOverride;
   const craftingPlayer = snapshot.crafting.player;
+  const harmonyType =
+    snapshot.crafting.recipeStats?.harmonyType ??
+    snapshot.crafting.recipe?.harmonyTypeOverride ??
+    null;
+  const harmonyConfig = harmonyType
+    ? window.modAPI?.gameData?.harmonyConfigs?.[harmonyType]
+    : undefined;
   const crafting = snapshot.crafting.progressState || snapshot.crafting.recipe
     ? {
         recipe: snapshot.crafting.recipe?.name ?? null,
@@ -300,9 +212,16 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
         perfection: snapshot.crafting.progressState?.perfection ?? null,
         stability: snapshot.crafting.progressState?.stability ?? null,
         harmony: snapshot.crafting.progressState?.harmony ?? null,
+        harmonyType,
+        harmonyState:
+          snapshot.crafting.progressState?.harmonyTypeData ?? null,
+        complexityMultiplier: harmonyConfig?.complexityMultiplier ?? null,
         condition: snapshot.crafting.progressState?.condition ?? null,
         step: snapshot.crafting.progressState?.step ?? null,
         consumedPills: snapshot.crafting.consumedPills,
+        autoUseItems: (
+          p.currentCraftingAutoUseLoadout?.slots ?? []
+        ).map((slot) => slot?.item ?? null),
         recommendedTechniqueTypes:
           snapshot.crafting.progressState?.harmonyTypeData?.recommendedTechniqueTypes ?? [],
         companion: craftingTeamUp ? asString(craftingTeamUp.displayName, craftingTeamUp.name) : null,
@@ -341,7 +260,9 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
   }));
 
   // Quests
-  const questDb = typeof window !== 'undefined' ? window.modAPI?.gameData.quests ?? null : null;
+  const questDb = typeof window !== 'undefined'
+    ? window.modAPI?.gameData?.quests ?? null
+    : null;
   const quests = (snapshot.quests.quests ?? []).map((q) => ({
     name: q.name,
     completedSteps: q.completed.length,
@@ -349,7 +270,9 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
   }));
 
   // NPCs
-  const charDb = typeof window !== 'undefined' ? window.modAPI?.gameData.characters ?? null : null;
+  const charDb = typeof window !== 'undefined'
+    ? window.modAPI?.gameData?.characters ?? null
+    : null;
   const followingChar = snapshot.characters.followingCharacter ?? null;
   const characters: GameContext['characters'] = [];
   for (const [name, state] of Object.entries(snapshot.characters.characterData ?? {})) {
@@ -396,6 +319,17 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
     activeEvent: Boolean(snapshot.gameEvent.gameEvent),
     flagCount: Object.keys(snapshot.gameData.flags ?? {}).length,
     combat, crafting,
+    research: {
+      queue: (snapshot.research?.queue ?? []).map((entry) => ({
+        material: entry.material,
+        remaining: [...entry.remaining],
+        discovered: [...entry.discovered],
+        materialReturned: entry.materialReturned ?? null,
+        progress: entry.progress,
+      })),
+      glyphs: [...(snapshot.research?.glyphs ?? [])],
+    },
+    coreFormationAltars: extractCoreFormationAltars(snapshot),
     soulShardDelve: extractSoulShardDelve(snapshot),
     recentEvents,
   };
@@ -462,7 +396,9 @@ function formatEquipment(equipment: EquipmentPiece[]): string {
   for (const eq of equipment) {
     const header = [`[${eq.slot}] ${eq.name}`];
     if (eq.enchantment) header.push(`enchant:${eq.enchantment}`);
-    if (eq.qualityTier) header.push(`Q${eq.qualityTier}`);
+    if (eq.harmonyType && eq.harmonyQuality !== null) {
+      header.push(`harmony:${eq.harmonyType} Q${eq.harmonyQuality}`);
+    }
     if (eq.extras.rarity) header.push(`${eq.extras.rarity}`);
     if (eq.extras.realm) header.push(`${eq.extras.realm}`);
     lines.push(header.join(' | '));
@@ -499,6 +435,24 @@ function formatCrafting(crafting: CraftingContext): string {
   if (crafting.harmony !== null) vals.push(`Harmony:${crafting.harmony}`);
   if (vals.length > 0) lines.push(vals.join(' | '));
   if (crafting.condition) lines.push(`Condition: ${crafting.condition}`);
+  if (crafting.harmonyType) {
+    lines.push(
+      `Selected harmony: ${crafting.harmonyType}` +
+        (crafting.complexityMultiplier !== null
+          ? ` (complexity x${crafting.complexityMultiplier})`
+          : ''),
+    );
+  }
+  if (crafting.harmonyState) {
+    lines.push(`Harmony state: ${JSON.stringify(crafting.harmonyState)}`);
+  }
+  if (crafting.autoUseItems.length > 0) {
+    lines.push(
+      `Crafting auto-use: ${crafting.autoUseItems
+        .map((item) => item ?? 'empty')
+        .join(', ')}`,
+    );
+  }
   if (crafting.step !== null) lines.push(`Step: ${crafting.step} | Pills: ${crafting.consumedPills}`);
   if (crafting.recommendedTechniqueTypes.length > 0) {
     lines.push(`Recommended: ${crafting.recommendedTechniqueTypes.join(', ')}`);
@@ -590,9 +544,47 @@ function formatGameState(context: GameContext): string {
     }
   }
 
+  if (context.research.queue.length > 0 || context.research.glyphs.length > 0) {
+    lines.push('', '=== RESEARCH ===');
+    if (context.research.glyphs.length > 0) {
+      lines.push(`Glyphs: ${context.research.glyphs.join(', ')}`);
+    }
+    for (const entry of context.research.queue) {
+      lines.push(
+        `${entry.material}: progress=${entry.progress}, remaining=${entry.remaining.join(', ') || 'none'}, discovered=${entry.discovered.join(', ') || 'none'}${entry.materialReturned === null ? '' : `, materialReturned=${entry.materialReturned}`}`,
+      );
+    }
+  }
+
+  if (context.coreFormationAltars) {
+    lines.push('', '=== CORE FORMATION ALTARS ===');
+    lines.push(`Beaten: ${context.coreFormationAltars.beatenAltars.join(', ')}`);
+    if (Object.keys(context.coreFormationAltars.combatStats).length > 0) {
+      lines.push(
+        `Combat rewards: ${JSON.stringify(context.coreFormationAltars.combatStats)}`,
+      );
+    }
+    if (Object.keys(context.coreFormationAltars.craftingStats).length > 0) {
+      lines.push(
+        `Crafting rewards: ${JSON.stringify(context.coreFormationAltars.craftingStats)}`,
+      );
+    }
+  }
+
   // Soul Shard Delve
   if (context.soulShardDelve) {
-    lines.push(`Soul Shard Delve: Floor ${context.soulShardDelve.floor}/${context.soulShardDelve.maxFloor}`);
+    const delve = context.soulShardDelve;
+    lines.push('', `=== SOUL SHARD DELVE === ${delve.delveKey ?? 'active run'}`);
+    if (delve.run) {
+      lines.push(
+        `Room ${delve.run.currentRoomIndex + 1}/${delve.run.nodeCount + 1}, stage ${delve.run.currentStageIndex + 1}, qither=${delve.run.progressQither}, difficulty=x${delve.run.difficultyMultiplier}${delve.run.failed ? ' (failed)' : ''}`,
+      );
+    }
+    if (delve.progression) {
+      lines.push(
+        `Progression: qither=${delve.progression.accumulatedQither}, threshold=${delve.progression.thresholdIndex}, source=${delve.progression.sourceItem ?? 'none'} (${delve.progression.sourcePower})`,
+      );
+    }
   }
 
   // Reputation

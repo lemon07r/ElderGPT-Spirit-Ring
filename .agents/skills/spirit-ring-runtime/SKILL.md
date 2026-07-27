@@ -35,6 +35,9 @@ ElderGPT Spirit Ring is a read-only advisor. Runtime integration observes the ga
 - Resolve equipment through `modAPI.gameData.items` when available.
 - Resolve stance slot counts through `modAPI.utils.getTechniqueSlots(realm)`.
 - Resolve translatable display names through `modAPI.utils.t()` when available.
+- Aggregate beaten Core Formation altar rewards through
+  `modAPI.actions.getCoreFormationAltarStats()` when available.
+- Preserve the research queue's `materialReturned` state.
 - Keep system prompt rules consolidated; avoid duplicated instruction blocks.
 
 ## Documentation And Skill Stewardship

@@ -3,7 +3,7 @@ title: UI Architecture
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-07-06
+last_verified: 2026-07-27
 source_of_truth: src/ui + src/ui/chatSession.ts + src/ui/sessionManager.ts + src/config/settings.ts + src/integration/uiBridge.tsx
 review_cycle_days: 30
 related_files: src/ui/index.tsx,src/ui/ElderGPTApp.tsx,src/ui/chatSession.ts,src/ui/sessionManager.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ui/components/SettingsPanel.tsx,src/ui/components/SpiritRingToggle.tsx,src/integration/uiBridge.tsx
@@ -45,7 +45,9 @@ Current usage:
   The minimized floating affordance. It handles open/drag behavior and surfaces unread assistant messages while the panel is closed.
 
 - `ChatPanel`
-  The main conversation surface. Reads live game state through `useSyncExternalStore`, reads settings/chat state from external stores. Features:
+  Coordinates live state, session actions, requests, dragging, and panel mode.
+  Rendering is split into `ChatTranscript`, `ChatComposer`, and
+  `SessionControls` while retaining the same stores and state flow. Features:
   - Connection status indicator (green/yellow/red dot replacing dev jargon)
   - Session name display for non-default sessions
   - Session history panel with switch/delete

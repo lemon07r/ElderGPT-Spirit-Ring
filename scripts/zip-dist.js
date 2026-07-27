@@ -2,6 +2,7 @@ const { zip } = require('zip-a-folder');
 const package = require('../package.json');
 const path = require('path');
 const fs = require('fs');
+const { readAfnmGameVersion } = require('./mod-package');
 
 function buildDistributionManifest() {
   return {
@@ -10,6 +11,7 @@ function buildDistributionManifest() {
     description: package.description,
     author: package.author,
     main: 'mod.js',
+    gameVersion: readAfnmGameVersion(),
   };
 }
 
@@ -37,6 +39,7 @@ async function zipDist() {
     console.log(`Successfully zipped ${package.name} to ${zipPath}`);
   } catch (err) {
     console.error('Error zipping dist folder:', err);
+    process.exitCode = 1;
   }
 }
 

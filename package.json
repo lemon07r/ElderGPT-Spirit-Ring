@@ -1,6 +1,8 @@
 {
   "name": "afnm-eldergpt-spirit-ring",
-  "version": "0.8.1",
+  "version": "0.9.0",
+  "gameVersion": "0.7.6",
+  "packageManager": "bun@1.3.14",
   "description": "AI-powered contextual chat assistant mod for Ascend From Nine Mountains",
   "author": {
     "name": "Lamim"
@@ -12,7 +14,10 @@
     "postbuild": "bun scripts/zip-dist.js",
     "workshop:preview": "bun run scripts/generate-workshop-preview.js",
     "workshop:upload": "bun run scripts/workshop-upload.ts",
-    "release:validate": "bun run test && bun run build && bun run runtime:oracle && bun run docs:check",
+    "typecheck": "tsc --noEmit",
+    "package:validate": "node scripts/validate-package.js",
+    "release:validate:ci": "bun run typecheck && bun run test && bun run build && bun run ui:harness:build && bun run package:validate && bun run docs:check",
+    "release:validate": "bun run typecheck && bun run test && bun run build && bun run ui:harness:build && bun run package:validate && bun run runtime:oracle && bun run docs:check",
     "test": "bun run jest",
     "test:watch": "bun run jest --watch",
     "test:coverage": "bun run jest --coverage",
@@ -30,7 +35,7 @@
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/react-dom": "^19.2.3",
-    "afnm-types": "0.7.0",
+    "afnm-types": "0.7.6",
     "file-loader": "^6.2.0",
     "jest": "^30.2.0",
     "prettier": "^3.8.1",
