@@ -47,7 +47,6 @@ export function SessionControls({
           return (
             <div
               key={session.id}
-              onClick={() => !active && onSwitch(session.id)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -61,19 +60,38 @@ export function SessionControls({
                     ? 'rgba(197,160,89,.15)'
                     : 'rgba(0,0,0,.2)',
                 border: `1px solid ${active ? '#C5A059' : 'rgba(197,160,89,.15)'}`,
-                cursor: active ? 'default' : 'pointer',
               }}
             >
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <button
+                type="button"
+                aria-current={active ? 'true' : undefined}
+                aria-label={`${active ? 'Current chat' : 'Switch to chat'}: ${session.name}`}
+                onClick={() => !active && onSwitch(session.id)}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  padding: 0,
+                  border: 0,
+                  background: 'none',
+                  color: 'inherit',
+                  cursor: active ? 'default' : 'pointer',
+                  textAlign: 'left',
+                }}
+              >
                 <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {session.name}
                 </div>
                 <small style={{ color: '#888' }}>
                   {new Date(session.updatedAt).toLocaleString()}
                 </small>
-              </div>
+              </button>
               <button
                 type="button"
+                aria-label={
+                  confirming
+                    ? `Confirm deletion of chat: ${session.name}`
+                    : `Delete chat: ${session.name}`
+                }
                 onClick={(event) => onDelete(session.id, event)}
                 style={{
                   ...buttonStyle,

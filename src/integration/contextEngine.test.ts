@@ -1,5 +1,5 @@
 import type { ModAPI, RootState } from 'afnm-types';
-import { extractContext } from './contextEngine';
+import { extractContext, getSystemPrompt } from './contextEngine';
 
 function createSnapshot(overrides: Partial<RootState> = {}): RootState {
   const baseSnapshot = {
@@ -461,5 +461,37 @@ describe('extractContext', () => {
     } finally {
       delete (globalThis as Partial<{ window: Window }>).window;
     }
+  });
+
+  it('includes active delve modifiers and pending rewards in the prompt', () => {
+    const snapshot = createSnapshot({
+      soulShardDelve: {
+        delveKey: 'needleFairyShard',
+        currentRun: {
+          nodes: [{ id: 'node-1' }],
+          currentRoomIndex: 0,
+          currentStageIndex: 1,
+          failedRun: false,
+          progressQither: 20,
+          difficultyMultiplier: 1.5,
+          blessings: ['Focused Mind'],
+          curses: ['Brittle Core'],
+          rewards: [{}],
+          nodeRewards: [{}, {}],
+          openedRewards: [],
+        },
+        progression: {},
+      } as unknown as RootState['soulShardDelve'],
+    });
+
+    const prompt = getSystemPrompt(
+      'Calculator',
+      '',
+      extractContext(snapshot),
+    );
+
+    expect(prompt).toContain('Blessings: Focused Mind');
+    expect(prompt).toContain('Curses: Brittle Core');
+    expect(prompt).toContain('Pending rewards: 3');
   });
 });

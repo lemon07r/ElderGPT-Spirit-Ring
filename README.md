@@ -61,25 +61,37 @@ It is **read-only by design**: it does not automate combat, spend resources, or 
 
 ## AI Setup
 
-ElderGPT Spirit Ring does **not** bundle an API key or a model. You bring your own. Here are a few options:
+ElderGPT Spirit Ring does **not** bundle an API key or a model. Bring an
+endpoint you trust and the exact model ID exposed by that endpoint.
 
 ### Hosted providers
 
 | Provider | API URL | Notes |
 |----------|---------|-------|
-| [OpenRouter](https://openrouter.ai/docs/quickstart) | `https://openrouter.ai/api/v1` | Many models, one endpoint. Easy starting point. |
-| [NVIDIA NIM](https://build.nvidia.com) | `https://integrate.api.nvidia.com/v1` | Free tier through the NVIDIA Developer Program. Try [kimi-k2-instruct-0905](https://docs.api.nvidia.com/nim/reference/moonshotai-kimi-k2-instruct-0905) for a fast default. |
+| [OpenRouter](https://openrouter.ai/docs/quickstart) | `https://openrouter.ai/api/v1` | Many models through one OpenAI-compatible endpoint. |
+| Anthropic | `https://api.anthropic.com` | Select Anthropic mode in the mod settings. |
 
 ### Local inference
 
-Run your own OpenAI-compatible server with [llama.cpp](https://github.com/ggml-org/llama.cpp) or [KoboldCpp](https://github.com/LostRuins/koboldcpp). Good small model families to try:
-
-- [Gemma 4](https://developers.googleblog.com/bring-state-of-the-art-agentic-skills-to-the-edge-with-gemma-4/) small variants
-- Qwen 3.5 small variants / GGUF builds
+Run your own OpenAI-compatible server with
+[llama.cpp](https://github.com/ggml-org/llama.cpp) or
+[KoboldCpp](https://github.com/LostRuins/koboldcpp).
 
 If your local server exposes an OpenAI-compatible `/v1` endpoint, ElderGPT Spirit Ring can use it.
 
 > **Tip:** Faster models usually feel better for moment-to-moment gameplay. The mod auto-detects your model's context window and output limits when possible, but you can override them in Settings.
+
+Provider plans, model availability, and limits change frequently. Check your
+provider's current documentation instead of relying on a fixed recommendation.
+
+### Privacy and data
+
+- API settings, the API key, UI preferences, and chat sessions are stored in
+  the game's local browser storage.
+- Each request sends the conversation and a focused snapshot of relevant game
+  state to the endpoint you configured.
+- The mod author does not operate an intermediary service. Use only an endpoint
+  you trust and a key you can revoke.
 
 ## Development
 
@@ -204,9 +216,9 @@ The mod follows a strict **modAPI-first** policy for AFNM `0.7.x`:
 
 1. Bump version in `package.json` (single source of truth).
 2. Run `bun run release:validate` to confirm tests, build, runtime oracle, and docs all pass.
-3. Commit and push to `main`.
-4. Tag with `vX.Y.Z` and push the tag — GitHub Actions builds and creates the release automatically.
-5. Upload to Steam Workshop: `bun run workshop:upload -- --change-note "vX.Y.Z - ..."`.
+3. Upload to Steam Workshop: `bun run workshop:upload -- --change-note "vX.Y.Z - ..."`.
+4. Commit and push to `main`.
+5. Tag with `vX.Y.Z` and push the tag — GitHub Actions builds and creates the release automatically.
 
 See [docs/project/RELEASE_PROCESS.md](docs/project/RELEASE_PROCESS.md) for the full checklist.
 

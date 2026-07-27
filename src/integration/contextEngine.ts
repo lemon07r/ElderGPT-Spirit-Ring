@@ -6,7 +6,6 @@ import type {
   Realm,
   RecipeHarmonyType,
   RootState,
-  Translatable,
 } from 'afnm-types';
 import { getGameStateSource, readGameStateSnapshot } from './gameState';
 import type {
@@ -20,6 +19,7 @@ import type {
 } from './contextTypes';
 import { buildEquipmentPiece } from './equipmentContext';
 import { extractSoulShardDelve } from './delveContext';
+import { asDisplayString } from './displayText';
 
 export type { GameContext } from './contextTypes';
 
@@ -53,27 +53,12 @@ const DEFAULT_CONTEXT: GameContext = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function asString(value: Translatable | string | undefined, fallback: string): string {
-  if (typeof value === 'string' && value.trim()) return value;
-  if (value && typeof value === 'object') {
-    try {
-      const t = typeof window !== 'undefined' ? window.modAPI?.utils?.t : undefined;
-      if (t) {
-        const translated = t(value as Translatable);
-        if (translated && translated.trim()) return translated;
-      }
-    } catch { /* fall through */ }
-    if ('key' in value && typeof value.key === 'string') return value.key;
-  }
-  return fallback;
-}
-
 function getDisplayLocation(snapshot: RootState): string {
   const locationId = snapshot.location.current;
   if (!locationId) return DEFAULT_CONTEXT.location;
   const displayName = typeof window === 'undefined'
     ? undefined : window.modAPI?.gameData?.locations?.[locationId]?.displayName;
-  return asString(displayName, locationId);
+  return asDisplayString(displayName, locationId);
 }
 
 function formatName(forename: string | undefined, surname: string | undefined): string {
@@ -174,7 +159,7 @@ function extractCombatContext(snapshot: RootState): CombatContext | null {
   }
 
   return {
-    enemyNames: enemies.map((e) => asString(e.displayName, e.name)),
+    enemyNames: enemies.map((e) => asDisplayString(e.displayName, e.name)),
     enemyCount: enemies.length,
     playerHp: playerState?.stats?.hp ?? null,
     playerMaxHp: playerState?.stats?.maxhp ?? null,
@@ -224,7 +209,7 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
         ).map((slot) => slot?.item ?? null),
         recommendedTechniqueTypes:
           snapshot.crafting.progressState?.harmonyTypeData?.recommendedTechniqueTypes ?? [],
-        companion: craftingTeamUp ? asString(craftingTeamUp.displayName, craftingTeamUp.name) : null,
+        companion: craftingTeamUp ? asDisplayString(craftingTeamUp.displayName, craftingTeamUp.name) : null,
         playerStats: craftingPlayer?.stats ? nonZeroMap(craftingPlayer.stats as unknown as Record<string, number>) : null,
       }
     : null;
@@ -279,7 +264,7 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
     if (state.approval === 0 && !state.beaten && name !== followingChar) continue;
     const charDef = charDb?.[name];
     characters.push({
-      name: charDef ? asString(charDef.displayName, name) : name,
+      name: charDef ? asDisplayString(charDef.displayName, name) : name,
       approval: state.approval,
       relationship: charDef?.relationship?.[state.relationshipIndex]?.relationshipCategory ?? null,
       isFollowing: name === followingChar,
@@ -578,6 +563,9 @@ function formatGameState(context: GameContext): string {
     if (delve.run) {
       lines.push(
         `Room ${delve.run.currentRoomIndex + 1}/${delve.run.nodeCount + 1}, stage ${delve.run.currentStageIndex + 1}, qither=${delve.run.progressQither}, difficulty=x${delve.run.difficultyMultiplier}${delve.run.failed ? ' (failed)' : ''}`,
+      );
+      lines.push(
+        `Blessings: ${delve.run.blessings.join(', ') || 'none'} | Curses: ${delve.run.curses.join(', ') || 'none'} | Pending rewards: ${delve.run.pendingRewards}`,
       );
     }
     if (delve.progression) {

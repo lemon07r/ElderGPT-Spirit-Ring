@@ -49,4 +49,36 @@ describe('0.7.6 equipment normalization', () => {
       }),
     );
   });
+
+  it('translates translatable equipment buff display names', () => {
+    const fullItem = {
+      name: 'Test Talisman',
+      kind: 'talisman',
+      buffs: [
+        {
+          buff: {
+            name: 'fallback_buff_name',
+            displayName: { key: 'buff.test.display_name' },
+          },
+        },
+      ],
+    } as unknown as Item;
+    window.modAPI = {
+      utils: {
+        getFullItem: jest.fn(() => fullItem),
+        t: jest.fn(() => 'Translated Test Buff'),
+      },
+    } as unknown as ModAPI;
+
+    const piece = buildEquipmentPiece(
+      'Talisman',
+      { name: 'Test Talisman' } as ItemDesc,
+      null,
+    );
+
+    expect(window.modAPI.utils.t).toHaveBeenCalledWith({
+      key: 'buff.test.display_name',
+    });
+    expect(piece?.buffs).toEqual(['Translated Test Buff']);
+  });
 });

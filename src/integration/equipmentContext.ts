@@ -1,11 +1,6 @@
 import type { Item, ItemDesc, RecipeHarmonyType, Translatable } from 'afnm-types';
 import type { EquipmentPiece } from './contextTypes';
-
-function asString(value: Translatable | string | undefined): string {
-  if (typeof value === 'string') return value;
-  if (value && typeof value === 'object' && 'key' in value) return value.key;
-  return '';
-}
+import { asDisplayString } from './displayText';
 
 function nonZeroMap(
   source: Record<string, unknown> | undefined,
@@ -50,7 +45,7 @@ export function buildEquipmentPiece(
         | undefined
     )
       ?.map((entry) =>
-        asString(entry.buff?.displayName ?? entry.buff?.name),
+        asDisplayString(entry.buff?.displayName, entry.buff?.name),
       )
       .filter(Boolean) ?? [];
   const extras: Record<string, string | number> = {};

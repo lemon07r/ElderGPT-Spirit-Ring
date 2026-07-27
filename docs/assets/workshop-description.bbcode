@@ -1,113 +1,72 @@
 [h1]ElderGPT Spirit Ring 0.9.0 — AFNM 0.7.6[/h1]
-[i]A read-only AI advisor overlay for Ascend From Nine Mountains.[/i]
+[i]A read-only, context-aware AI advisor inside Ascend From Nine Mountains.[/i]
 
-[h2]Latest update[/h2]
-v0.9.0 updates the advisor for AFNM 0.7.6 with harmony-augmented equipment,
-selected crafting harmony, native crafting auto-use, current research and Soul
-Shard Delve state, and Core Formation altar rewards. It also refreshes the
-embedded mechanics guidance and keeps proactive hooks read-only.
+Bring your own OpenAI-compatible or Anthropic model and ask for advice without leaving the game. ElderGPT reads the current run through the official ModAPI, builds a focused context snapshot, and adds relevant game-mechanics guidance to each conversation.
 
-Want advice without tabbing out to a browser?
-ElderGPT Spirit Ring reads your live game state through the official modAPI, builds a compact context snapshot, and lets you chat with the AI model of your choice inside the game.
+[h2]What's new in 0.9.0[/h2]
+[list]
+[*]Updated and revalidated for AFNM 0.7.6.
+[*]Understands harmony-augmented equipment and both crafting and combat stats.
+[*]Adds selected crafting harmony, harmony state, complexity, and native auto-use slots.
+[*]Adds current research, Core Formation altar rewards, and the real Soul Shard Delve run/progression state.
+[*]Refreshes embedded crafting, combat, cultivation, and progression guidance against the current runtime.
+[/list]
 
 [h2]Highlights[/h2]
 [list]
-[*][b]Read-only by design[/b] - it does not automate combat, spend resources, or make choices for you.
-[*][b]Always nearby[/b] - open it from the floating Spirit Ring button, or from the combat victory screen.
-[*][b]Live context[/b] - advice is grounded in your current run, not a generic wiki answer. The AI sees harmony-augmented equipment, selected crafting harmony, auto-use, research, Core Formation altar rewards, Soul Shard Delves, inventory, techniques, quests, NPC relationships, and more.
-[*][b]Deep game knowledge[/b] - the AI is fed relevant crafting, combat, cultivation knowledge, and real stat formulas based on what you are doing right now. It can see your actual equipment stats and do real math with them.
-[*][b]Persistent chat with sessions[/b] - conversations are saved automatically. Switch between chats, start new ones, or pick up where you left off.
-[*][b]Smart context management[/b] - automatically detects your model's context window and compacts long conversations so the AI never loses track.
-[*][b]Streaming responses[/b] - see words as the AI responds, with markdown formatting and a loading animation.
-[*][b]Optional proactive hints[/b] - it can chime in after important moments like combat, travel, crafting, and time skips.
-[*][b]Bring your own model[/b] - works with OpenAI-compatible providers, Anthropic API endpoints, or local servers.
-[*][b]Configurable timeout[/b] - increase the request timeout up to 999 seconds for slow or distributed inference setups.
-[*][b]Customizable UI[/b] - adjust text size, window size, and drag the panel anywhere on screen. Position persists across sessions.
+[*][b]Read-only by design[/b] — observes your run but does not automate combat, spend resources, or make choices.
+[*][b]Live game context[/b] — equipment, stats, inventory, techniques, crafting, research, delves, quests, relationships, and other relevant state.
+[*][b]Persistent sessions[/b] — chats are saved locally; start a new session or resume an earlier one.
+[*][b]Streaming and context management[/b] — streams replies and compacts long conversations to stay within model limits.
+[*][b]Optional proactive hints[/b] — suggestions after moments such as combat, travel, crafting, and time skips.
+[*][b]Flexible providers[/b] — supports OpenAI-compatible endpoints, Anthropic endpoints, and compatible local servers.
+[*][b]Customizable overlay[/b] — choose a persona, adjust text and panel size, and drag the panel where you want it.
 [/list]
 
-[h2]What you can ask it[/h2]
-[quote]
-"What should I focus on next?"
+[h2]What you can ask[/h2]
+[quote]"What should I focus on next?"
 
 "How should I approach this fight?"
 
-"Compare my equipped armor stats."
+"Compare my equipped armor."
 
-"What am I missing in this crafting setup?"
+"What is holding back this craft?"
 
-"Which stats or resources are holding me back?"
+"Explain how my selected harmony changes the targets."
 
-"Explain how Inscribed Patterns harmony works."
-
-"What quests should I prioritize?"
-[/quote]
+"Which quests or resources should I prioritize?"[/quote]
 
 [h2]Quick start[/h2]
 [list]
-[*]Open the Spirit Ring from the floating circular button.
-[*]Open [b]Settings[/b].
-[*]Enter your API URL, API key, and model ID.
-[*]Pick a persona if you want.
-[*]Ask for advice normally in plain language.
+[*]Open the floating [b]Spirit Ring[/b] button.
+[*]Open [b]Settings[/b] and choose OpenAI Compatible or Anthropic.
+[*]Enter the endpoint URL, API key if required, and exact model ID.
+[*]Choose Elder, Calculator, or a custom persona, then start chatting.
 [/list]
 
-[h2]Personas[/h2]
+[h2]Provider setup[/h2]
+The mod does not bundle a model or API key. Use a provider you already trust, an aggregator such as [url=https://openrouter.ai/docs/quickstart]OpenRouter[/url], or a local OpenAI-compatible server such as [url=https://github.com/ggml-org/llama.cpp]llama.cpp[/url] or [url=https://github.com/LostRuins/koboldcpp]KoboldCpp[/url].
+
+Provider plans, models, and limits change often, so check your provider's current documentation. Faster models generally feel better for in-game use. ElderGPT detects context/output limits from supported APIs when possible, and manual overrides are available in Settings.
+
+[h2]Privacy and data[/h2]
 [list]
-[*][b]Elder[/b] - An ancient cultivation elder who speaks in Xianxia idioms. Gives advice framed through Dao philosophy while referencing actual game mechanics.
-[*][b]Calculator[/b] - A cold optimization engine. Leads with numbers, percentages, and comparisons. No fluff.
-[*][b]Custom[/b] - Write your own persona prompt. The AI still receives live game state and knowledge context.
+[*]Your endpoint settings, API key, UI preferences, and chat sessions are stored in the game's local browser storage.
+[*]When you send a message, the mod sends the conversation and a focused snapshot of relevant game state to your configured endpoint.
+[*]Nothing is sent to a service operated by this mod's author.
+[*]Use only an endpoint you trust and a key you can revoke.
 [/list]
 
-[h2]Recommended AI setup options[/h2]
-[b]1) Use your favorite hosted provider[/b]
-
-If you already have a provider you like, use that.
-[url=https://openrouter.ai/docs/quickstart]OpenRouter[/url] is an easy choice because it gives you access to a lot of models through one OpenAI-compatible endpoint.
-
-[code]https://openrouter.ai/api/v1[/code]
-
-[b]2) Good free hosted option: NVIDIA NIM[/b]
-
-[url=https://build.nvidia.com]NVIDIA NIM[/url] is a strong free option for testing and light use through the NVIDIA Developer Program.
-It exposes an OpenAI-compatible API, so it drops straight into the mod.
-
-[code]https://integrate.api.nvidia.com/v1[/code]
-
-If you want a fast, strong default there, try [url=https://docs.api.nvidia.com/nim/reference/moonshotai-kimi-k2-instruct-0905]moonshotai / kimi-k2-instruct-0905[/url].
-It is one of the faster good options on NIM right now and usually feels responsive for in-game advice.
-
-[b]3) Good free local option: run your own server[/b]
-
-If you want private or fully local inference, run an OpenAI-compatible server with [url=https://github.com/ggml-org/llama.cpp]llama.cpp[/url] or [url=https://github.com/LostRuins/koboldcpp]KoboldCpp[/url].
-
-Good small local model families to try:
-[list]
-[*][url=https://developers.googleblog.com/bring-state-of-the-art-agentic-skills-to-the-edge-with-gemma-4/]Gemma 4[/url] small variants
-[*]Qwen 3.5 small variants / GGUF builds
-[/list]
-
-If your local runner exposes an OpenAI-compatible [code]/v1[/code] endpoint, ElderGPT Spirit Ring can use it.
-
-[h2]Good to know[/h2]
-[list]
-[*]This mod does not include an API key or a bundled model.
-[*]Advice quality depends heavily on the model you choose.
-[*]Faster models usually feel better for moment-to-moment gameplay.
-[*]The mod auto-detects your model's context window and output limits when possible, but you can override them in Settings.
-[*]Long conversations are automatically summarized to stay within context limits.
-[*]Proactive hints are optional and can be disabled in Settings.
-[/list]
-
-[h2]Feedback and bugs[/h2]
-If the advice feels wrong, confusing, or out of date, leave a comment with what was happening in-game and what the mod told you.
-That is the fastest way to improve it.
+[h2]Feedback and source[/h2]
+If advice is wrong or a feature misbehaves, include what you were doing in-game and what the advisor said.
+[url=https://github.com/lemon07r/ElderGPT-Spirit-Ring/issues]Report an issue on GitHub[/url] or leave a Workshop comment.
 
 [h1]My Other Mods[/h1]
 [list]
-[*][url=https://steamcommunity.com/sharedfiles/filedetails/?id=3661729323]CraftBuddy[/url] - A live crafting optimizer overlay with AutoBuddy auto mode
-[*][url=https://steamcommunity.com/sharedfiles/filedetails/?id=3694065051]Lucky All Around[/url] - Configurable pity-event luck weighting for Explore events
+[*][url=https://steamcommunity.com/sharedfiles/filedetails/?id=3661729323]CraftBuddy[/url] — a live crafting optimizer with AutoBuddy mode.
+[*][url=https://steamcommunity.com/sharedfiles/filedetails/?id=3694065051]Lucky All Around[/url] — configurable Explore pity-event luck weighting.
 [/list]
-[url=https://steamcommunity.com/sharedfiles/filedetails/?id=3704747572]View all my mods in my AFNM mod collection[/url]
+[url=https://steamcommunity.com/sharedfiles/filedetails/?id=3704747572]View my AFNM mod collection[/url]
 
 [h1]Make Your Own Mod[/h1]
-Want to build your own AFNM mod? Use the [url=https://github.com/lemon07r/AfnmAgentModTemplate]AFNM Agent Mod Template[/url] to get started fast with a ready-to-go scaffold, ModAPI reference docs, runtime validation scripts, and Workshop packaging built in. Works great with AI coding agents too.
+Use the [url=https://github.com/lemon07r/AfnmAgentModTemplate]AFNM Agent Mod Template[/url] for a ready-to-go scaffold with current ModAPI references, runtime validation, packaging, and Workshop publishing support.

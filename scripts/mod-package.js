@@ -2,10 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const packageJson = require('../package.json');
 
-const versionFile = path.resolve(
-  __dirname,
-  '..',
-  'node_modules/afnm-types/dist/gameVersion.js',
+const versionFile = path.join(
+  path.dirname(require.resolve('afnm-types')),
+  'gameVersion.js',
 );
 
 function readAfnmGameVersion() {
