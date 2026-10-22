@@ -1,21 +1,21 @@
-[h1]ElderGPT Spirit Ring 0.10.0 — AFNM 0.7.17[/h1]
+[h1]ElderGPT Spirit Ring 0.11.0 — AFNM 0.7.17[/h1]
 [i]A read-only, context-aware AI advisor inside Ascend From Nine Mountains.[/i]
 
 Bring your own OpenAI-compatible or Anthropic model and ask for advice without leaving the game. ElderGPT reads the current run through the official ModAPI, builds a focused context snapshot, and adds relevant game-mechanics guidance to each conversation.
 
-[h2]What's new in 0.10.0[/h2]
+[h2]What's new in 0.11.0[/h2]
 [list]
-[*]Updated for AFNM 0.7.17, with the combat-result shortcut checked against the current game interface.
-[*]Refreshes guidance for unified health, Charisma-based party capacity, reworked tournaments, and all nine crafting harmonies, including Captivating Cadence and Returning Cycle.
-[*]Understands the new Qi and Stability cost reduction/penalty stats instead of the old cost multipliers.
-[*]Adds a compact sect summary: rank, carried vault slips, accepted missions, and active or ready favour services.
-[*]Tracks the focused quest and resolves translated event-history text correctly when the game language changes.
+[*][b]Consult the records[/b] — compatible models can look up items, techniques, buffs, monsters, recipes and breakthroughs, plus your full inventory with item details. Expand the lookup row to see what was consulted.
+[*][b]Player notes[/b] — ask the Elder to remember a preference, or add/edit/delete notes in Settings. Notes carry across chats (30 notes, 500 characters each).
+[*][b]Cheaper/faster repeated replies where supported[/b] — stable prompts and Anthropic caching hints help providers reuse context. Actual savings and cache hits vary.
+[*][b]Stop, Retry and long-answer fixes[/b] — stop while keeping partial text, retry a failed turn without duplicating it, and let long live replies continue while data keeps arriving.
+[*][b]Better model compatibility[/b] — bounded connection retries and parameter fallbacks; rejected tools fall back to ordinary chat. Temperature is optional, not forced on reasoning models.
 [/list]
 
 [h2]Highlights[/h2]
 [list]
 [*][b]Read-only by design[/b] — observes your run but does not automate combat, spend resources, or make choices.
-[*][b]Live game context[/b] — equipped item stats, inventory names/counts, techniques, crafting, research, delves, quests, relationships, and sect activity. It cannot inspect unequipped item stats or hidden enemy details.
+[*][b]Live game context[/b] — equipment, inventory, techniques, crafting, research, delves, quests, relationships and sect activity. Optional records lookups expand details; they do not reveal arbitrary hidden formulas or execute game actions.
 [*][b]Persistent sessions[/b] — chats are saved locally; start a new session or resume an earlier one.
 [*][b]Streaming and context management[/b] — streams replies and compacts long conversations to stay within model limits.
 [*][b]Optional proactive hints[/b] — suggestions after moments such as combat, travel, crafting, and time skips.
@@ -42,6 +42,7 @@ Bring your own OpenAI-compatible or Anthropic model and ask for advice without l
 [*]Open [b]Settings[/b] and choose OpenAI Compatible or Anthropic.
 [*]Enter the endpoint URL, API key if required, and exact model ID.
 [*]Choose Elder, Calculator, or a custom persona, then start chatting.
+[*]Records lookups default on and need a tool-capable model. Disable them in Settings for unsupported local models. Blank Temperature keeps your provider's default.
 [/list]
 
 [h2]Provider setup[/h2]
@@ -49,10 +50,13 @@ The mod does not bundle a model or API key. Use a provider you already trust, an
 
 Provider plans, models, and limits change often, so check your provider's current documentation. Faster models generally feel better for in-game use. ElderGPT detects context/output limits from supported APIs when possible, and manual overrides are available in Settings.
 
+Live replies use a silence-between-data timeout; non-live replies use a total request timeout. Increase it for models that think silently. Advice can still be wrong, so double-check important decisions.
+
 [h2]Privacy and data[/h2]
 [list]
 [*]Your endpoint settings, API key, UI preferences, and chat sessions are stored in the game's local browser storage.
 [*]When you send a message, the mod sends the conversation and a focused snapshot of relevant game state to your configured endpoint.
+[*]Enabled lookups send additional record/inventory details in follow-up requests. Player notes are included in advisor prompts; lookup labels are saved with the reply, not the raw tool transcript.
 [*]If you enable proactive hints, they also send automatic requests with current game context to that endpoint.
 [*]Nothing is sent to a service operated by this mod's author.
 [*]Use only an endpoint you trust and a key you can revoke.

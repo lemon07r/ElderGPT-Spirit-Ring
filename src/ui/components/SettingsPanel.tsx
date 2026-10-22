@@ -3,6 +3,7 @@ import type { ApiProvider, ChatSettings, FontSize, PanelSize, Persona } from '..
 import { FONT_SIZES, TIMEOUT_NOTCHES, nearestNotchIndex } from '../../config/settings';
 import { detectModelLimits, getStaticModelLimits } from '../../ai/modelLimits';
 import { isTextEntryElement, pasteClipboardIntoElement } from '../inputShortcuts';
+import { MemoryNotesSection } from './MemoryNotesSection';
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -139,7 +140,7 @@ export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelP
       </label>
 
       <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <span>Request Timeout</span>
+        <span>Response / Idle Timeout</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <input
             type="range"
@@ -163,6 +164,9 @@ export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelP
             {settings.requestTimeoutSeconds}s
           </span>
         </div>
+        <p style={{ margin: 0, color: '#a69d8c', fontSize: '11px', lineHeight: 1.3 }}>
+          Live responses: time to first data and maximum silence between incoming data (including thinking or keepalives). Without live response: total request time. Increase for models that think silently.
+        </p>
       </label>
 
       <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -209,6 +213,14 @@ export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelP
           />
         </label>
       )}
+
+      <MemoryNotesSection notes={settings.memoryNotes} />
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <input name="gameLookups" type="checkbox" checked={settings.gameLookups} onChange={handleChange} />
+        <span>Let the Elder look things up in the game's records</span>
+      </label>
+      <p style={{ margin: 0, color: '#a69d8c', fontSize: '12px' }}>Some local models do not support lookups; turn this off if needed.</p>
 
       <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         <span>Text Size</span>
@@ -300,6 +312,21 @@ export function SettingsPanel({ onClose, settings, setSettings }: SettingsPanelP
           />
           <span style={{ color: '#a69d8c', fontSize: '11px', whiteSpace: 'nowrap' }}>tokens</span>
         </div>
+      </label>
+
+      <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <span>Temperature (optional)</span>
+        <input
+          type="number"
+          min={0}
+          max={1}
+          step={0.1}
+          value={settings.temperature ?? ''}
+          placeholder="Provider default"
+          onChange={(event) => setSettings({ temperature: event.target.value === '' ? null : Number(event.target.value) })}
+          style={inputStyle}
+        />
+        <p style={{ margin: 0, color: '#a69d8c', fontSize: '11px' }}>Leave blank for the provider default; recommended for reasoning models.</p>
       </label>
 
       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>

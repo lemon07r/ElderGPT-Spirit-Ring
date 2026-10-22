@@ -1,5 +1,6 @@
 import type { ModAPI, RootState } from 'afnm-types';
-import { extractContext, getSystemPrompt } from './contextEngine';
+import { extractContext, formatGameState, getSystemPrompt } from './contextEngine';
+import { selectKnowledge } from '../ai/knowledge';
 
 function createSnapshot(overrides: Partial<RootState> = {}): RootState {
   const baseSnapshot = {
@@ -239,6 +240,35 @@ function createSnapshot(overrides: Partial<RootState> = {}): RootState {
 }
 
 describe('extractContext', () => {
+  it('keeps the system prefix byte-stable when only HP, day and location change', () => {
+    const first = createSnapshot();
+    const second = createSnapshot();
+    second.player.player.hp = 7;
+    second.calendar.day = 24;
+    second.location.current = 'Third Mountain';
+    const a = extractContext(first);
+    const b = extractContext(second);
+    expect(formatGameState(a)).not.toBe(formatGameState(b));
+    const prompt = getSystemPrompt('Elder', '', selectKnowledge(a, 5000));
+    expect(getSystemPrompt('Elder', '', selectKnowledge(b, 5000))).toBe(prompt);
+    expect(prompt).not.toContain('=== GAME STATE ===');
+    expect(prompt).not.toContain('Liang Tiao Village');
+    expect(prompt).toContain("player's latest message");
+    expect(prompt).toContain('earlier turns may describe older state');
+  });
+
+  it('injects notes in creation order, after knowledge, without IDs or timestamps', () => {
+    const notes = [
+      { id: 'late', text: 'Prefer safety.', createdAt: 200 },
+      { id: 'early', text: 'Use short answers.\nExplain numbers.', createdAt: 100 },
+    ];
+    const prompt = getSystemPrompt('Calculator', '', 'STATIC KNOWLEDGE', notes);
+    expect(prompt).toContain('STATIC KNOWLEDGE\n\nPLAYER NOTES (standing preferences from the player; follow them unless the player says otherwise):\n- Use short answers.\n  Explain numbers.\n- Prefer safety.');
+    expect(prompt).not.toMatch(/createdAt|\bearly\b|\blate\b|\b100\b|\b200\b/);
+    expect(notes[0].id).toBe('late');
+    expect(getSystemPrompt('Calculator', '', 'STATIC KNOWLEDGE')).not.toContain('PLAYER NOTES');
+  });
+
   it('returns a stable fallback when no snapshot is available', () => {
     const ctx = extractContext(null);
     expect(ctx).toEqual(
@@ -488,11 +518,7 @@ describe('extractContext', () => {
       } as unknown as RootState['soulShardDelve'],
     });
 
-    const prompt = getSystemPrompt(
-      'Calculator',
-      '',
-      extractContext(snapshot),
-    );
+    const prompt = formatGameState(extractContext(snapshot));
 
     expect(prompt).toContain('Blessings: Focused Mind');
     expect(prompt).toContain('Curses: Brittle Core');
@@ -513,7 +539,7 @@ describe('extractContext', () => {
       }];
       expect(extractContext(snapshot).recentEvents[0].texts).toEqual(['English event']);
       language = 'French';
-      const prompt = getSystemPrompt('Calculator', '', extractContext(snapshot));
+      const prompt = formatGameState(extractContext(snapshot));
       expect(prompt).toContain('French event');
       expect(prompt).not.toContain('[object Object]');
     } finally {
@@ -527,7 +553,7 @@ describe('extractContext', () => {
       focusedQuest: 'Promotion',
       quests: [{ name: 'Promotion', seenUpTo: 0, completed: [0], killTally: {}, raidsComplete: 0 }],
     };
-    expect(getSystemPrompt('Calculator', '', extractContext(snapshot))).toContain('Promotion (1/1) [focused]');
+    expect(formatGameState(extractContext(snapshot))).toContain('Promotion (1/1) [focused]');
   });
 
   it.each(['captivatingCadence', 'returningCycle'] as const)('preserves %s and split crafting costs', (harmonyType) => {
@@ -538,7 +564,7 @@ describe('extractContext', () => {
     } as RootState['crafting']['player'];
     const context = extractContext(snapshot);
     expect(context.crafting?.harmonyType).toBe(harmonyType);
-    const prompt = getSystemPrompt('Calculator', '', context);
+    const prompt = formatGameState(context);
     expect(prompt).toContain('qiCostReduction=20, qiCostPenalty=10, stabilityCostReduction=30, stabilityCostPenalty=5');
   });
 
@@ -573,7 +599,7 @@ describe('extractContext', () => {
         missionCount: 1, missions: [{ name: 'Patrol', completedSteps: 1, deadlineMonth: 30 }],
         serviceCount: 1, services: [{ kind: 'materialRequest', status: 'ready', target: 'Spirit Iron' }],
       });
-      const prompt = getSystemPrompt('Calculator', '', context);
+      const prompt = formatGameState(context);
       expect(prompt).toContain('=== SECT === rank=coreDisciple');
       expect(prompt).toContain('Vault slips: Treasure Slip (I) x5');
       expect(prompt).toContain('Mission: Patrol, steps completed=1, deadline absolute month=30');

@@ -54,7 +54,7 @@ describe('AIClient', () => {
     const client = new AIClient('http://localhost:1234', '', 'gpt-test');
     const response = await client.chat([{ role: 'user', content: 'Guide me.' }]);
 
-    expect(response).toBe('The Dao flows clearly.');
+    expect(response).toEqual({ text: 'The Dao flows clearly.' });
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:1234/v1/chat/completions',
       expect.objectContaining({
@@ -88,27 +88,21 @@ describe('AIClient', () => {
         body: JSON.stringify({
           model: 'kimi-k2.5',
           messages: [{ role: 'user', content: 'Guide me.' }],
-          temperature: 0.7,
         }),
       }),
     );
   });
 
   test('surfaces API error bodies', async () => {
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: false,
-      status: 401,
-      json: async () => ({
-        error: {
-          message: 'Bad API key',
-        },
-      }),
-    }) as unknown as typeof fetch;
+    global.fetch = jest.fn().mockResolvedValue(Response.json({
+      error: { message: 'Bad API key' },
+    }, { status: 401 }));
 
     const client = new AIClient('http://localhost:1234', 'bad-key', 'gpt-test');
     const response = await client.chat([{ role: 'user', content: 'Guide me.' }]);
 
-    expect(response).toContain('Bad API key');
+    expect(response.text).toContain('Bad API key');
+    expect(response.error).toBe(true);
   });
 
   test('uses configurable timeout from options', async () => {
@@ -129,7 +123,7 @@ describe('AIClient', () => {
     });
 
     const response = await client.chat([{ role: 'user', content: 'Guide me.' }]);
-    expect(response).toContain('timed out');
+    expect(response.text).toContain('timed out');
   }, 10_000);
 
   describe('Anthropic provider', () => {
@@ -155,12 +149,13 @@ describe('AIClient', () => {
         { role: 'user', content: 'Guide me.' },
       ]);
 
-      expect(response).toBe('The elder speaks.');
+      expect(response).toEqual({ text: 'The elder speaks.' });
 
       const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-      expect(body.system).toBe('You are an elder.');
+      expect(body.system).toEqual([{ type: 'text', text: 'You are an elder.', cache_control: { type: 'ephemeral' } }]);
       expect(body.messages).toEqual([{ role: 'user', content: 'Guide me.' }]);
       expect(body.max_tokens).toBe(4096);
+      expect(body.temperature).toBeUndefined();
     });
 
     test('uses x-api-key header and anthropic-version', async () => {
@@ -189,16 +184,9 @@ describe('AIClient', () => {
     });
 
     test('surfaces Anthropic error bodies', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 401,
-        json: async () => ({
-          error: {
-            type: 'authentication_error',
-            message: 'Invalid API key',
-          },
-        }),
-      }) as unknown as typeof fetch;
+      global.fetch = jest.fn().mockResolvedValue(Response.json({
+        error: { type: 'authentication_error', message: 'Invalid API key' },
+      }, { status: 401 }));
 
       const client = new AIClient({
         url: 'https://api.anthropic.com',
@@ -208,7 +196,7 @@ describe('AIClient', () => {
       });
 
       const response = await client.chat([{ role: 'user', content: 'test' }]);
-      expect(response).toContain('Invalid API key');
+      expect(response.text).toContain('Invalid API key');
     });
   });
 });

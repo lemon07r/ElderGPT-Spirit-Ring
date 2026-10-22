@@ -6,6 +6,7 @@ import type {
   Realm,
   RootState,
 } from 'afnm-types';
+import { readSettingsSnapshot, type MemoryNote } from '../config/settings';
 import { getGameStateSource, readGameStateSnapshot } from './gameState';
 import type {
   CombatContext,
@@ -338,7 +339,7 @@ You are "The Calculator", a cold analytical optimization engine embedded in a sp
 STYLE: Clipped, efficient. Lead with numbers, comparisons, percentages. Frame as optimization: "Option A yields X, B yields Y. A is 23% better." Conditional recs: "IF [cond] THEN [action]." Blunt about inefficiency.`,
 };
 
-function buildSystemPrompt(persona: string, customPrompt: string, context: GameContext, knowledgeBlock: string): string {
+function buildSystemPrompt(persona: string, customPrompt: string, knowledgeBlock: string, memoryNotes: readonly MemoryNote[]): string {
   const parts: string[] = [];
 
   // 1. Persona
@@ -351,19 +352,26 @@ function buildSystemPrompt(persona: string, customPrompt: string, context: GameC
   // 2. Core rules (one place, no duplication)
   parts.push(`\
 RULES:
-- Reference the player's live game state (shown below) in every answer.
+- Reference the live game state attached to the player's latest message in every answer. It reflects the current moment; earlier turns may describe older state.
 - You CAN see: equipped item stats, player stats, combat stats, inventory names/counts, techniques, stances (with slot counts), quests, NPCs, and the sect summary when available.
-- You CANNOT see: unequipped item stats, enemy internals beyond what combat shows, hidden formulas beyond your knowledge base.
-- NEVER fabricate stats, formulas, or item data. If you lack data, say so IMMEDIATELY in your first sentence.
-- When calculating, state which values you used and where they came from.
+${readSettingsSnapshot().gameLookups
+    ? '- Use lookup tools for item, technique, buff, monster, quest, location, recipe and breakthrough details and the player\'s full inventory instead of guessing. Do not look up what the attached state already shows; prefer one search then one get. Never claim to have looked something up you did not.'
+    : '- You CANNOT see: unequipped item stats, enemy internals beyond what combat shows, hidden formulas beyond your knowledge base.'}
+- Never guess a number you could look up or calculate from the data shown; if unavailable, say so in your first sentence. Never invent items, techniques, stats, formulas, locations, or sources.
+- Lead with the answer, then the reasoning and numbers used (with their sources), then a next step if useful.
+- Ask a clarifying question only when you truly cannot answer.
 - Keep answers concise: 2-4 sentences for quick questions, a short paragraph for complex strategy.
 - Never mention system internals, APIs, or mod implementation details.`);
 
   // 3. Knowledge (contextual -- already filtered by status)
   if (knowledgeBlock) parts.push(knowledgeBlock);
 
-  // 4. Live game state (tiered by status)
-  parts.push(formatGameState(context));
+  // 4. Standing player preferences. No timestamps or live state in this prefix.
+  if (memoryNotes.length > 0) {
+    parts.push('PLAYER NOTES (standing preferences from the player; follow them unless the player says otherwise):\n' +
+      [...memoryNotes].sort((a, b) => a.createdAt - b.createdAt)
+        .map((note) => `- ${note.text.replace(/\n/g, '\n  ')}`).join('\n'));
+  }
 
   return parts.join('\n\n');
 }
@@ -450,7 +458,7 @@ function formatCrafting(crafting: CraftingContext): string {
   return lines.join('\n');
 }
 
-function formatGameState(context: GameContext): string {
+export function formatGameState(context: GameContext): string {
   const lines: string[] = ['=== GAME STATE ==='];
 
   // Always: core identity
@@ -620,6 +628,6 @@ function formatGameState(context: GameContext): string {
 // Public API
 // ---------------------------------------------------------------------------
 
-export function getSystemPrompt(persona: string, customPrompt: string, context: GameContext, knowledgeBlock?: string): string {
-  return buildSystemPrompt(persona, customPrompt, context, knowledgeBlock ?? '');
+export function getSystemPrompt(persona: string, customPrompt: string, knowledgeBlock = '', memoryNotes: readonly MemoryNote[] = []): string {
+  return buildSystemPrompt(persona, customPrompt, knowledgeBlock, memoryNotes);
 }

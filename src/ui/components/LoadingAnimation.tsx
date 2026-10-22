@@ -1,6 +1,6 @@
 import React from 'react';
 
-export function LoadingAnimation() {
+export function LoadingAnimation({ lookupLabel }: { lookupLabel?: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 4px' }}>
       <style>{`
@@ -28,7 +28,7 @@ export function LoadingAnimation() {
         }}>☯</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '3px', flexWrap: 'wrap' }}>
-        {['Contemplating', 'the', 'Dao'].map((word, i) => (
+        {(lookupLabel ? [`Consulting the records: ${lookupLabel}`] : ['Contemplating', 'the', 'Dao']).map((word, i) => (
           <span key={word} style={{
             color: '#C5A059',
             fontStyle: 'italic',

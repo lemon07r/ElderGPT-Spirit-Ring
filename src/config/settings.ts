@@ -3,6 +3,15 @@ export type ApiProvider = 'openai' | 'anthropic';
 export type FontSize = 'small' | 'medium' | 'large';
 export type PanelSize = 'compact' | 'default' | 'large';
 
+export interface MemoryNote {
+  id: string;
+  text: string;
+  createdAt: number;
+}
+
+export const MAX_MEMORY_NOTES = 30;
+export const MAX_MEMORY_NOTE_LENGTH = 500;
+
 export interface ChatSettings {
   apiUrl: string;
   apiKey: string;
@@ -17,7 +26,10 @@ export interface ChatSettings {
   showStreaming: boolean;
   contextLimitTokens: number | null;
   outputLimitTokens: number | null;
+  temperature: number | null;
   autoTitle: boolean;
+  memoryNotes: MemoryNote[];
+  gameLookups: boolean;
 }
 
 export const SETTINGS_STORAGE_KEY = 'eldergpt_settings';
@@ -48,7 +60,10 @@ export const DEFAULT_SETTINGS: ChatSettings = {
   showStreaming: true,
   contextLimitTokens: null,
   outputLimitTokens: null,
+  temperature: null,
   autoTitle: true,
+  memoryNotes: [],
+  gameLookups: true,
 };
 
 const MOD_TAG = '[ElderGPT]';
@@ -87,6 +102,22 @@ function normalizeNullablePositiveInt(value: unknown): number | null {
   return Math.round(value);
 }
 
+function normalizeMemoryNotes(value: unknown): MemoryNote[] {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set<string>();
+  const notes: MemoryNote[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry) || typeof entry.id !== 'string' || !entry.id.trim() ||
+      typeof entry.text !== 'string' || !entry.text.trim() ||
+      typeof entry.createdAt !== 'number' || !Number.isFinite(entry.createdAt) || entry.createdAt < 0) continue;
+    const id = entry.id.trim();
+    if (ids.has(id)) continue;
+    ids.add(id);
+    notes.push({ id, text: entry.text.trim().slice(0, MAX_MEMORY_NOTE_LENGTH), createdAt: entry.createdAt });
+  }
+  return notes.sort((a, b) => a.createdAt - b.createdAt).slice(0, MAX_MEMORY_NOTES);
+}
+
 function normalizeSettings(value: unknown): ChatSettings {
   if (!isRecord(value)) {
     return DEFAULT_SETTINGS;
@@ -109,7 +140,12 @@ function normalizeSettings(value: unknown): ChatSettings {
     showStreaming: typeof value.showStreaming === 'boolean' ? value.showStreaming : DEFAULT_SETTINGS.showStreaming,
     contextLimitTokens: normalizeNullablePositiveInt(value.contextLimitTokens),
     outputLimitTokens: normalizeNullablePositiveInt(value.outputLimitTokens),
+    temperature: typeof value.temperature === 'number' && Number.isFinite(value.temperature)
+      ? Math.max(0, Math.min(1, value.temperature))
+      : null,
     autoTitle: typeof value.autoTitle === 'boolean' ? value.autoTitle : DEFAULT_SETTINGS.autoTitle,
+    memoryNotes: normalizeMemoryNotes(value.memoryNotes),
+    gameLookups: typeof value.gameLookups === 'boolean' ? value.gameLookups : DEFAULT_SETTINGS.gameLookups,
   };
 }
 
@@ -174,6 +210,43 @@ export function updateSettings(
   saveSettings(currentSettings);
   emit();
   return currentSettings;
+}
+
+export type MemoryNoteResult = { note: MemoryNote; error?: never } | { error: string; note?: never };
+
+function validateNoteText(text: string): string | null {
+  if (!text.trim()) return 'Enter a note first.';
+  if (text.trim().length > MAX_MEMORY_NOTE_LENGTH) return `Notes must be ${MAX_MEMORY_NOTE_LENGTH} characters or fewer.`;
+  return null;
+}
+
+export function addMemoryNote(text: string): MemoryNoteResult {
+  const error = validateNoteText(text);
+  if (error) return { error };
+  const normalized = text.trim().toLowerCase();
+  const existing = currentSettings.memoryNotes.find((note) => note.text.trim().toLowerCase() === normalized);
+  if (existing) return { note: existing };
+  if (currentSettings.memoryNotes.length >= MAX_MEMORY_NOTES) return { error: `You can keep up to ${MAX_MEMORY_NOTES} notes. Delete a note before adding another.` };
+  const createdAt = Date.now();
+  const note = { id: `${createdAt}-${Math.random().toString(36).slice(2, 10)}`, text: text.trim(), createdAt };
+  updateSettings({ memoryNotes: [...currentSettings.memoryNotes, note] });
+  return { note };
+}
+
+export function updateMemoryNote(id: string, text: string): MemoryNoteResult {
+  const existing = currentSettings.memoryNotes.find((note) => note.id === id);
+  if (!existing) return { error: 'That note no longer exists.' };
+  const error = validateNoteText(text);
+  if (error) return { error };
+  const note = { ...existing, text: text.trim() };
+  updateSettings({ memoryNotes: currentSettings.memoryNotes.map((entry) => entry.id === id ? note : entry) });
+  return { note };
+}
+
+export function deleteMemoryNote(id: string): boolean {
+  if (!currentSettings.memoryNotes.some((note) => note.id === id)) return false;
+  updateSettings({ memoryNotes: currentSettings.memoryNotes.filter((note) => note.id !== id) });
+  return true;
 }
 
 export function nearestNotchIndex(value: number): number {

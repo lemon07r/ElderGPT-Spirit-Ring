@@ -2,8 +2,10 @@ import {
   appendAssistantMessage,
   appendUserMessage,
   readChatSessionSnapshot,
+  recordChatUsage,
   resetChatSession,
   setChatOpen,
+  replaceMessages,
 } from './chatSession';
 
 describe('chatSession', () => {
@@ -37,5 +39,20 @@ describe('chatSession', () => {
     setChatOpen(false);
     appendAssistantMessage('A hidden warning returns.');
     expect(readChatSessionSnapshot().unreadCount).toBe(1);
+  });
+
+  test('tracks latest advisor input tokens only for the active session and resets after rewinding', () => {
+    const id = readChatSessionSnapshot().sessionId;
+    recordChatUsage(id, { inputTokens: 1234 });
+    recordChatUsage('different-session', { inputTokens: 9999 });
+    recordChatUsage(id, { outputTokens: 8 });
+    expect(readChatSessionSnapshot().reportedInputTokens).toBe(1234);
+    recordChatUsage(id, { inputTokens: 456 });
+    expect(readChatSessionSnapshot().reportedInputTokens).toBe(456);
+    replaceMessages(readChatSessionSnapshot().messages);
+    expect(readChatSessionSnapshot().reportedInputTokens).toBeUndefined();
+    recordChatUsage(id, { inputTokens: 1234 });
+    resetChatSession();
+    expect(readChatSessionSnapshot().reportedInputTokens).toBeUndefined();
   });
 });

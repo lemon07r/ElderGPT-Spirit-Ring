@@ -17,13 +17,13 @@ Generated on: 2026-10-22
 
 | Category | Count |
 |---|---|
-| project | 10 |
+| project | 11 |
 | dev-request | 0 |
 | project-meta | 0 |
 | history | 0 |
 | reference | 1 |
 | root-or-other | 3 |
-| total | 14 |
+| total | 15 |
 
 ## Authoritative Docs
 
@@ -36,6 +36,7 @@ Generated on: 2026-10-22
 | `docs/project/DOC_INVENTORY.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 | `docs/project/LIVE_GAME_TESTING.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 | `docs/project/RELEASE_NOTES_0.10.0.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
+| `docs/project/RELEASE_NOTES_0.11.0.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 | `docs/project/RELEASE_NOTES_0.9.0.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 | `docs/project/RELEASE_PROCESS.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 | `docs/project/UI_ARCHITECTURE.md` | project | active | true | eldergpt-maintainers | keep-authoritative |

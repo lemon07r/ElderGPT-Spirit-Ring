@@ -6,11 +6,6 @@ import React, {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { AIClient } from '../../ai/client';
-import { compactConversation, needsCompaction } from '../../ai/compaction';
-import { selectKnowledge } from '../../ai/knowledge';
-import { getStaticModelLimits } from '../../ai/modelLimits';
-import { estimateTokens } from '../../ai/tokenEstimator';
 import {
   FONT_SIZES,
   PANEL_DIMENSIONS,
@@ -22,7 +17,6 @@ import {
 } from '../../config/settings';
 import {
   extractContext,
-  getSystemPrompt,
 } from '../../integration/contextEngine';
 import {
   readGameStateSnapshot,
@@ -31,20 +25,13 @@ import {
 import { type Corner, getClosestCorner } from '../../utils/dragUtils';
 import { useDraggable } from '../../utils/useDraggable';
 import {
-  appendAssistantMessage,
-  appendStreamChunk,
-  appendUserMessage,
-  finalizeStreamingMessage,
   flushSession,
   readChatSessionSnapshot,
-  renameSession,
-  replaceMessages,
-  setChatLoading,
   startNewChat,
-  startStreamingMessage,
   subscribeToChatSession,
   switchToSession,
 } from '../chatSession';
+import { sendChatTurn } from '../chatTurn';
 import {
   isTextEntryElement,
   pasteClipboardIntoElement,
@@ -62,8 +49,6 @@ interface Props {
 }
 
 const PANEL_MARGIN = 20;
-const KNOWLEDGE_TOKEN_BUDGET_RATIO = 0.3;
-const OUTPUT_RESERVE_TOKENS = 2048;
 type ConnectionStatus = 'live' | 'partial' | 'offline';
 
 const STATUS_COLORS: Record<ConnectionStatus, string> = {
@@ -201,108 +186,22 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
     return () => window.removeEventListener('keydown', handleEscape, true);
   }, [showSettings, showSessions, onClose]);
 
-  const generateSessionTitle = async (client: AIClient) => {
-    const conversation = readChatSessionSnapshot()
-      .messages.filter((message) => message.role !== 'system')
-      .slice(0, 4)
-      .map((message) => `${message.role}: ${message.content.slice(0, 200)}`)
-      .join('\n');
+  const runTurn = async (prompt?: string) => {
+    if (readChatSessionSnapshot().isLoading) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
-      const title = await client.chat([
-        {
-          role: 'system',
-          content:
-            'Generate a concise chat title (max 6 words). Reply with only the title.',
-        },
-        { role: 'user', content: conversation },
-      ]);
-      const cleaned = title
-        .trim()
-        .replace(/^["']|["']$/g, '')
-        .replace(/\.+$/, '')
-        .slice(0, 60);
-      if (cleaned && !cleaned.startsWith('[System:')) renameSession(cleaned);
-    } catch {
-      // Automatic titles are best effort.
+      await sendChatTurn(prompt, controller.signal);
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
     }
   };
 
-  const handleSend = async () => {
+  const handleSend = () => {
     const prompt = input.trim();
-    if (!prompt || chatState.isLoading) return;
-    appendUserMessage(prompt);
+    if (!prompt || readChatSessionSnapshot().isLoading) return;
     setInput('');
-    setChatLoading(true);
-
-    const contextWindow =
-      settings.contextLimitTokens ??
-      getStaticModelLimits(settings.modelId).contextWindow;
-    const outputReserve =
-      settings.outputLimitTokens ?? OUTPUT_RESERVE_TOKENS;
-    const knowledge = selectKnowledge(
-      context,
-      Math.floor(contextWindow * KNOWLEDGE_TOKEN_BUDGET_RATIO),
-    );
-    const systemContent = getSystemPrompt(
-      settings.persona,
-      settings.customPrompt,
-      context,
-      knowledge,
-    );
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const client = new AIClient({
-      url: settings.apiUrl,
-      apiKey: settings.apiKey,
-      modelId: settings.modelId,
-      provider: settings.provider,
-      timeoutMs: settings.requestTimeoutSeconds * 1000,
-      maxOutputTokens: settings.outputLimitTokens ?? undefined,
-    });
-    let messages = readChatSessionSnapshot().messages;
-    const needsTitle =
-      settings.autoTitle &&
-      readChatSessionSnapshot().sessionName === 'New Chat';
-
-    try {
-      if (
-        needsCompaction(
-          estimateTokens(systemContent),
-          messages,
-          contextWindow,
-          outputReserve,
-        )
-      ) {
-        const result = await compactConversation(messages, client);
-        if (result.compacted) {
-          messages = result.messages;
-          replaceMessages(messages);
-        }
-      }
-      if (controller.signal.aborted) return;
-      if (settings.showStreaming) {
-        startStreamingMessage();
-        const response = await client.chatStream(
-          [{ role: 'system', content: systemContent }, ...messages],
-          (chunk) => {
-            if (!controller.signal.aborted) appendStreamChunk(chunk);
-          },
-        );
-        if (!controller.signal.aborted) finalizeStreamingMessage(response);
-      } else {
-        const response = await client.chat([
-          { role: 'system', content: systemContent },
-          ...messages,
-        ]);
-        if (!controller.signal.aborted) appendAssistantMessage(response);
-      }
-      if (needsTitle && !controller.signal.aborted) {
-        void generateSessionTitle(client);
-      }
-    } finally {
-      abortRef.current = null;
-      setChatLoading(false);
-    }
+    void runTurn(prompt);
   };
 
   const handleDelete = (id: string, event: React.MouseEvent) => {
@@ -484,8 +383,11 @@ export function ChatPanel({ corner, setCorner, onClose }: Props) {
             messages={chatState.messages}
             persona={settings.persona}
             fontSize={fontSize}
-            showLoading={chatState.isLoading && !isStreamingWithContent}
+            showLoading={chatState.isLoading && (!isStreamingWithContent || !!chatState.lookupLabel)}
             listRef={messageListRef}
+            onRetry={() => void runTurn()}
+            isLoading={chatState.isLoading}
+            lookupLabel={chatState.lookupLabel}
           />
           <ChatComposer
             input={input}

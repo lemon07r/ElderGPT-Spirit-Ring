@@ -26,6 +26,28 @@ The main UI is a persistent body-mounted React/MUI overlay plus targeted `inject
 - Chat/session persistence lives in `src/ui/chatSession.ts` and `src/ui/sessionManager.ts`.
 - Persisted configuration lives in `src/config/settings.ts`.
 - Game state comes from the integration snapshot/subscription bridge.
+- `src/ui/chatTurn.ts` owns Send/Retry, knowledge/compaction, the bounded agent
+  loop, finalization, and best-effort title generation. Do not duplicate this
+  pipeline in ChatPanel or Retry handlers.
+- Assistant text plus optional error/stopped/lookups/notice metadata persists.
+  Lookup metadata is `{ label, ok }[]`, display-only. Raw tool protocol and
+  attached state never persist; old sessions without metadata still load.
+- The single API builder in `src/ai/messages.ts` strips display-only metadata
+  and excludes failed/stopped/empty replies from all model-visible history.
+- Current lookup label and latest reported advisor input tokens are ephemeral
+  session state. Global notes (30 x 500 characters) and gameLookups (default on)
+  are settings, not per-session history.
+
+## Advisor Controls
+
+- Stop aborts the active request/loop, preserves partial text marked stopped,
+  and removes an empty placeholder. Only the trailing error offers Retry.
+- Transcript lookup rows start collapsed, expand to labels, and mark failures;
+  loading shows the current lookup label even beside intermediate streamed text.
+- Endpoint/model capability notices appear once per app session, never in API
+  messages. Some local models need the records toggle off.
+- Settings supports note CRUD, optional temperature, and a timeout hint:
+  streaming byte-idle time versus total non-streaming request time.
 
 ## Validation
 
@@ -34,7 +56,11 @@ bun run ui:harness:build
 bun run ui:harness:serve
 ```
 
-Use the harness for open/close behavior, unread badges, session switching, settings layout, markdown rendering, and simulated proactive messages. Live game checks are only for runtime-specific overlay/injected UI behavior.
+Use the harness for open/close behavior, unread badges, sessions, settings,
+markdown, proactive messages, failure/Retry, and `Simulate Lookup Turn` (real
+Send/agent pipeline with mock fetch/data). Live game checks are only for
+runtime-specific overlay/injected UI behavior. The 0.11.0 lookup-row screenshot
+and expanded-label check were harness-only, not an in-game test.
 
 ## Gotchas
 

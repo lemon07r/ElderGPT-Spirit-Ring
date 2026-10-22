@@ -1,6 +1,6 @@
 {
   "name": "afnm-eldergpt-spirit-ring",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "gameVersion": "0.7.17",
   "packageManager": "bun@1.3.14",
   "description": "AI-powered contextual chat assistant mod for Ascend From Nine Mountains",

@@ -1,4 +1,5 @@
 import { DEFAULT_SETTINGS, updateSettings } from "../config/settings";
+import { readChatSessionSnapshot } from '../ui/chatSession';
 import {
   __testing as proactiveTesting,
   registerProactiveHooks,
@@ -222,5 +223,20 @@ describe("proactive hook lifecycle", () => {
       state: "perfect",
       item: { name: "Cloudsteel Ring" },
     });
+  });
+
+  it('attaches live state to the synthetic user prompt, not its system prefix or session history', async () => {
+    const hookApi = installWindowWithHooks();
+    updateSettings({ proactiveEnabled: true, memoryNotes: [{ id: 'note', text: 'Prefer safety', createdAt: 1 }] });
+    registerProactiveHooks();
+    hookApi.callbacks.onLocationEnter!('Third Mountain');
+    await new Promise((resolve) => setImmediate(resolve));
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    expect(body.messages[0].content).toContain('PLAYER NOTES');
+    expect(body.messages[0].content).toContain('Prefer safety');
+    expect(body.messages[0].content).not.toContain('=== GAME STATE ===');
+    expect(body.messages[1].content).toMatch(/^<game_state captured_at_send>\n=== GAME STATE ===/);
+    expect(body.messages[1].content).toContain('</game_state>\n\nThe player just entered Third Mountain.');
+    expect(JSON.stringify(readChatSessionSnapshot().messages)).not.toContain('<game_state');
   });
 });

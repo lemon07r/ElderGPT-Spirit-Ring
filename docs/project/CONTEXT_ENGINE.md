@@ -4,9 +4,9 @@ status: active
 authoritative: true
 owner: eldergpt-maintainers
 last_verified: 2026-10-22
-source_of_truth: src/integration/contextEngine.ts + src/integration/gameState.ts + src/ai/knowledge/
+source_of_truth: src/integration/contextEngine.ts + src/integration/gameState.ts + src/integration/gameLookup.ts + src/ai/knowledge/
 review_cycle_days: 30
-related_files: src/integration/contextEngine.ts,src/integration/gameState.ts,src/ai/knowledge/index.ts,src/ai/knowledge/statFormulas.ts,src/ui/components/ChatPanel.tsx
+related_files: src/integration/contextEngine.ts,src/integration/gameState.ts,src/integration/gameLookup.ts,src/ai/knowledge/index.ts,src/ai/knowledge/statFormulas.ts,src/ai/messages.ts,src/ui/chatTurn.ts,src/config/settings.ts
 ---
 
 # Context Engine
@@ -80,13 +80,51 @@ The `GameContext` payload includes:
 
 `getSystemPrompt()` builds a consolidated prompt with no duplicated instructions:
 
-1. **Persona block** -- compact personality and style instructions. Three built-in personas (Elder, Calculator, Custom).
+1. **Persona block** -- compact personality/style instructions: Elder, Calculator,
+   or a player-supplied Custom prompt.
 
-2. **Rules block** -- single unified block covering data access boundaries, fabrication rules, and response guidelines. Replaces the old separate KNOWLEDGE_BOUNDARIES + RESPONSE_GUIDELINES blocks.
+2. **Rules block** -- one access/fabrication/response block. With `gameLookups`
+   enabled, use records for details/full inventory rather than guessing; do not
+   re-query state already shown, prefer search then get, and never claim an
+   unperformed lookup. Disabled: retain the unequipped-stats/hidden-internals
+   CANNOT-see boundary. Rules depend on the setting, not the current turn.
 
 3. **Knowledge block** -- status-driven game knowledge injected via `src/ai/knowledge/`. See below.
 
-4. **Tiered game state** -- formatted context organized by relevance to current activity.
+4. **Player notes** -- normalized global preferences, creation-ordered, without
+   timestamps in the prompt. Settings supports add/edit/delete, up to 30 notes
+   of 500 characters each. `save_note` requires an explicit player request.
+
+This stable prefix contains **no live state**. `formatGameState()` supplies a
+separate `<game_state captured_at_send>` block on the newest player message via
+the single `buildApiMessages()` boundary. State and tool transcripts are not
+persisted. Tool-result user blocks and the final-answer user note do not become
+the state target. Title and compaction requests remain state/notes/tool-free;
+proactive advisor requests use the same builder with current state, but no tools.
+
+For fixed persona, knowledge, notes, and lookup setting, the system prefix is
+byte-identical across turns. Selected knowledge can still change with activity
+or token budget. Anthropic caches the last system block, the history before the
+latest player message, and the last tool definition; see [AI Client](AI_CLIENT.md).
+
+## On-Demand Records (`src/integration/gameLookup.ts`)
+
+The regular snapshot stays compact. Tool-capable models can expand carried and
+stored inventory into item descriptions/stats, known combat/crafting techniques,
+or authored registry entries (items, buffs, monsters, quests, locations, recipes,
+breakthroughs, and other indexed categories). Translation/tooltip helpers are
+read-only; arbitrary authored functions/scaling are not executed. Functions,
+React elements, cyclic references, and media are omitted from bounded output.
+
+Item sources index static shops/vaults, monster drops, and recipe outputs when
+available. They are partial listings, not guarantees of current availability.
+No action, save/load, reward, purchase, or gameplay mutation is exposed.
+
+Verification is partial: source-only real-data probes covered nine registries
+and eleven search/get pairs in AFNM 0.7.17. Quest/location initialization did not
+complete outside the game, and in-game translation/resolver and real shop/vault
+behavior remain mocked-only. The provider protocol smoke uses synthetic data;
+it does not close those runtime gaps. No live in-game test was run for 0.11.0.
 
 ## Tiered Game State Formatting
 

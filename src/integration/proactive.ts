@@ -3,7 +3,7 @@ import { AIClient } from '../ai/client';
 import { selectKnowledge } from '../ai/knowledge';
 import { readSettingsSnapshot, subscribeToSettings } from '../config/settings';
 import { appendAssistantMessage, readChatSessionSnapshot } from '../ui/chatSession';
-import { extractContext, getSystemPrompt } from './contextEngine';
+import { extractContext, formatGameState, getSystemPrompt } from './contextEngine';
 import { readGameStateSnapshot } from './gameState';
 
 type ProactiveTrigger =
@@ -166,28 +166,29 @@ async function processQueue() {
         provider: settings.provider,
         timeoutMs: settings.requestTimeoutSeconds * 1000,
         maxOutputTokens: settings.outputLimitTokens ?? undefined,
+        temperature: settings.temperature,
       });
       const response = await client.chat([
         {
           role: 'system',
-          content: getSystemPrompt(settings.persona, settings.customPrompt, context, knowledgeBlock),
+          content: getSystemPrompt(settings.persona, settings.customPrompt, knowledgeBlock, settings.memoryNotes),
         },
         {
           role: 'user',
           content: `${describeTrigger(entry.trigger)} Keep it to at most two short sentences. If there is no materially useful advice, reply with exactly "SKIP". Do not mention hooks, APIs, or system internals.`,
         },
-      ]);
+      ], { gameState: formatGameState(context) });
 
-      if (response === 'SKIP' || response.startsWith('[System:')) {
+      if (response.text === 'SKIP' || response.stopped) {
         continue;
       }
 
       // Final check: still on the same session before appending
-      if (readChatSessionSnapshot().sessionId !== entry.sessionId) {
+      if (readChatSessionSnapshot().sessionId !== entry.sessionId || readChatSessionSnapshot().isLoading) {
         continue;
       }
 
-      appendAssistantMessage(response);
+      appendAssistantMessage(response.text, { error: response.error });
       lastProactiveAt = Date.now();
     }
   } catch (error) {

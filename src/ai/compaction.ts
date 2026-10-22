@@ -1,5 +1,6 @@
 import type { Message } from './client';
 import { AIClient } from './client';
+import { buildApiMessages } from './messages';
 import { estimateTokens, estimateMessagesTokens } from './tokenEstimator';
 
 const PRESERVE_RECENT_COUNT = 6;
@@ -34,12 +35,12 @@ RULES:
 - Keep the summary under 400 words
 - Write in third person ("The player asked...", "The advisor recommended...")`;
 
-function isSummaryMessage(msg: Message): boolean {
-  return msg.role === 'system' && msg.content.startsWith(SUMMARY_MARKER);
+export function isSummaryMessage(msg: Message): boolean {
+  return msg.role === 'system' && msg.content.slice(0, 300).includes(SUMMARY_MARKER);
 }
 
 function formatMessagesForSummary(messages: Message[]): string {
-  return messages
+  return buildApiMessages(messages)
     .map((m) => `[${m.role}]: ${m.content}`)
     .join('\n\n');
 }
@@ -49,11 +50,13 @@ export function needsCompaction(
   messages: Message[],
   contextWindow: number,
   outputReserve: number,
+  reportedInputTokens?: number,
+  reportedHistoryTokens?: number,
 ): boolean {
+  messages = buildApiMessages(messages);
   if (messages.length < MIN_MESSAGES_FOR_COMPACTION) return false;
   if (messages.length >= MESSAGE_COUNT_THRESHOLD) return true;
-  const messagesTokens = estimateMessagesTokens(messages);
-  const total = systemPromptTokens + messagesTokens + outputReserve;
+  const total = estimateContextUsage(systemPromptTokens, messages, outputReserve, reportedInputTokens, reportedHistoryTokens);
   return total >= contextWindow * CONTEXT_USAGE_THRESHOLD;
 }
 
@@ -65,6 +68,7 @@ export interface CompactionResult {
 export async function compactConversation(
   messages: Message[],
   client: AIClient,
+  signal?: AbortSignal,
 ): Promise<CompactionResult> {
   if (messages.length < MIN_MESSAGES_FOR_COMPACTION) {
     return { messages, compacted: false };
@@ -94,16 +98,16 @@ export async function compactConversation(
   }
 
   try {
-    const summaryText = await client.chat([
+    const result = await client.chat([
       { role: 'system', content: COMPACTION_PROMPT },
       { role: 'user', content: userContent },
-    ]);
+    ], signal);
 
-    if (!summaryText || summaryText.startsWith('[System:')) {
+    if (result.error || result.stopped || !result.text.trim()) {
       return { messages, compacted: false };
     }
 
-    const summaryMessage: Message = { role: 'system', content: summaryText };
+    const summaryMessage: Message = { role: 'system', content: result.text };
     return {
       messages: [summaryMessage, ...preserved],
       compacted: true,
@@ -117,6 +121,16 @@ export function estimateContextUsage(
   systemPromptTokens: number,
   messages: Message[],
   outputReserve: number,
+  reportedInputTokens?: number,
+  reportedHistoryTokens?: number,
 ): number {
-  return systemPromptTokens + estimateMessagesTokens(messages) + outputReserve;
+  const historyTokens = estimateMessagesTokens(buildApiMessages(messages));
+  const addedTokens = reportedHistoryTokens !== undefined && Number.isFinite(reportedHistoryTokens) && reportedHistoryTokens >= 0
+    ? Math.max(0, historyTokens - reportedHistoryTokens)
+    : 0;
+  const freshEstimate = systemPromptTokens + historyTokens;
+  const input = reportedInputTokens !== undefined && Number.isFinite(reportedInputTokens) && reportedInputTokens >= 0
+    ? Math.max(reportedInputTokens + addedTokens, freshEstimate)
+    : freshEstimate;
+  return input + outputReserve;
 }

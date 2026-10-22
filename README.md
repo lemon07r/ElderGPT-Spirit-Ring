@@ -22,23 +22,36 @@ Want advice without tabbing out to a browser? ElderGPT Spirit Ring reads your li
 
 It is **read-only by design**: it does not automate combat, spend resources, or make choices for you.
 
-**Release 0.10.0 targets AFNM 0.7.17.** See the
-[release notes](docs/project/RELEASE_NOTES_0.10.0.md) for compatibility checks and changes.
+**Release 0.11.0 targets AFNM 0.7.17.** See the
+[release notes](docs/project/RELEASE_NOTES_0.11.0.md) for provider smoke results and known limits.
 
 ## Features
 
 - 💬 **Persistent chat with sessions** — conversations are saved automatically. Switch between chats, start new ones, or pick up where you left off.
+- 📚 **Consult the records** — tool-capable models can look up item, technique,
+  buff, monster, recipe, and breakthrough details, and expand your full inventory.
+  A compact expandable row shows what was consulted. Quest/location lookup paths
+  are implemented but not verified in a running game.
+- 📝 **Player notes** — keep global preferences across chats; edit/delete them in
+  Settings, or explicitly ask the Elder to remember something (up to 30 notes,
+  500 characters each).
 - 🧠 **Focused game knowledge** — compact, verified crafting, combat, and cultivation guidance follows your current activity, including nine harmonies, unified health, and the new crafting cost stats.
 - 🎯 **Live 0.7.17 context** — advice includes resolved harmony-augmented
   equipment, selected crafting harmony/state, crafting auto-use, research,
   Core Formation altar rewards, soul-shard delve progression, focused quests,
   translated event history, and a compact sect rank/slips/missions/services summary.
-- 📊 **Smart context management** — automatically detects your model's context window and compacts long conversations so the AI never loses track.
-- ⚡ **Streaming responses** — see words as the AI responds, with markdown formatting and a loading animation.
+- 📊 **Smarter context and caching** — compacts long chats using reported usage
+  when available. Stable prompts and Anthropic cache hints can make repeated
+  replies cheaper/faster where your provider supports caching; savings vary.
+- ⚡ **Reliable long replies** — live text, markdown, Stop, Retry, and timeouts
+  that allow long answers while data keeps arriving. Transient failures and
+  unsupported model parameters get bounded automatic retries/fallbacks.
 - 🔔 **Proactive hints** — optional post-event suggestions after combat victories, travel, crafting completions, and time skips.
 - 🏆 **Combat result shortcut** — a "Consult Spirit Ring" button opens the same chat from the result dialog via `modAPI.injectUI()`.
 - 🎭 **Personas** — choose between the lore-flavored *Elder* voice, the analytical *Calculator*, or write your own *Custom* persona prompt.
-- 🔌 **Bring your own model** — any OpenAI-compatible endpoint works (hosted providers, local servers, Anthropic, etc.).
+- 🔌 **Bring your own model** — OpenAI-compatible or Anthropic endpoints,
+  including compatible local servers. Tool support varies; ordinary chat can
+  continue when a provider rejects lookups.
 - 🎨 **Customizable UI** — adjust text size, window size, and drag the panel anywhere. Position persists across sessions.
 
 ## What You Can Ask
@@ -54,6 +67,8 @@ It is **read-only by design**: it does not automate combat, spend resources, or 
 > *"Which stats or resources are holding me back?"*
 >
 > *"Explain how Inscribed Patterns harmony works."*
+>
+> *"What does Rot do, and do I have any pills that help?"*
 
 ## Installation (Players)
 
@@ -85,6 +100,20 @@ If your local server exposes an OpenAI-compatible `/v1` endpoint, ElderGPT Spiri
 
 > **Tip:** Faster models usually feel better for moment-to-moment gameplay. The mod auto-detects your model's context window and output limits when possible, but you can override them in Settings.
 
+### New settings and controls in 0.11.0
+
+- **Let the Elder look things up in the game's records** defaults on. Use a
+  tool-capable model, or disable it for local models that do not support tools.
+- **Player notes** apply to every chat. Save only preferences you want sent to
+  your configured endpoint; they are not a private notebook hidden from the AI.
+- **Stop** keeps partial text; **Retry** re-sends a failed player turn without
+  duplicating it. Stopped/failed replies are excluded from future AI history.
+- **Response / Idle Timeout** is silence between incoming data for live replies,
+  but total request time when live response is off. Thinking/keepalives count as
+  data; increase the timeout for models that think silently.
+- **Temperature** is optional; blank keeps the provider default (recommended
+  for reasoning models). **Max Output** remains an optional override.
+
 Provider plans, model availability, and limits change frequently. Check your
 provider's current documentation instead of relying on a fixed recommendation.
 
@@ -95,6 +124,9 @@ provider's current documentation instead of relying on a fixed recommendation.
 - Each chat request sends the conversation and a focused snapshot of relevant
   game state to your endpoint. Optional proactive hints also send automatic
   requests with current game context when enabled.
+- Lookup-enabled replies can send additional game-record/inventory details in
+  follow-up requests. Player notes are included in advisor prompts. Raw tool
+  transcripts are not saved in chat sessions; lookup labels are.
 - The mod author does not operate an intermediary service. Use only an endpoint
   you trust and a key you can revoke.
 
@@ -136,6 +168,10 @@ src/
 ├── mod.ts                  # Mod entry point and metadata
 ├── ai/
 │   ├── client.ts           # Multi-provider chat completions transport
+│   ├── agent.ts            # Bounded Send/Retry lookup loop
+│   ├── messages.ts         # Single API-message builder and metadata filter
+│   ├── tools.ts            # Stable tool schemas and guarded dispatcher
+│   ├── usage.ts            # Provider token/cache usage parsing
 │   ├── compaction.ts       # Conversation compaction via anchored iterative summarization
 │   ├── modelLimits.ts      # Model context/output limit detection and static fallback table
 │   ├── tokenEstimator.ts   # Token count estimation heuristic
@@ -150,6 +186,7 @@ src/
 ├── integration/
 │   ├── gameState.ts        # Live game state bridge (modAPI → fallback)
 │   ├── contextEngine.ts    # System prompt builder with formatted context and knowledge injection
+│   ├── gameLookup.ts       # Read-only game-record and player-detail lookup adapter
 │   ├── proactive.ts        # Proactive suggestion hooks (post-combat, travel, etc.)
 │   ├── uiBridge.tsx        # modAPI.injectUI() entry points
 │   └── index.ts            # Integration bootstrap
@@ -157,6 +194,7 @@ src/
 │   ├── index.tsx            # Overlay mount and React root
 │   ├── ElderGPTApp.tsx      # Top-level app component
 │   ├── chatSession.ts       # Conversation state store with session persistence
+│   ├── chatTurn.ts          # Shared Send/Retry, compaction and title pipeline
 │   ├── sessionManager.ts    # Session CRUD, auto-naming, and localStorage persistence
 │   └── components/
 │       ├── ChatPanel.tsx    # Main chat interface with session management
@@ -169,34 +207,17 @@ src/
 
 ### Architecture at a glance
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    AFNM Game (Electron)                      │
-│                                                              │
-│  window.modAPI ──► gameState.ts ──► contextEngine.ts         │
-│       │                                    │                 │
-│       │                              GameContext             │
-│       │                                    │                 │
-│       ▼                                    ▼                 │
-│  proactive.ts                     getSystemPrompt()          │
-│  (hooks: combat,                    + knowledge/             │
-│   location, time,                  (dynamic injection)       │
-│   crafting, loot)                        │                   │
-│       │                                  ▼                   │
-│       ▼                  ┌─────── ai/client.ts ───────┐      │
-│  appendAssistantMessage()│   POST /chat/completions    │      │
-│       │                  │   + max_tokens              │      │
-│       ▼                  └─────────────────────────────┘      │
-│  ┌─ ui/ ──────────────────────────┘                          │
-│  │  ChatPanel ◄─► chatSession store ◄─► sessionManager      │
-│  │     │              │                                      │
-│  │     │         compaction.ts (auto-summarize long chats)   │
-│  │  SettingsPanel ◄─► settings store ◄─► modelLimits.ts     │
-│  │  SpiritRingToggle (floating FAB)                          │
-│  └───────────────────────────────────────────────────────────┘
-│                                                              │
-│  uiBridge.tsx ──► modAPI.injectUI() (combat victory CTA)     │
-└──────────────────────────────────────────────────────────────┘
+```text
+modAPI -> gameState -> contextEngine + knowledge + notes
+                                   |
+ChatPanel -> chatTurn -> messages builder -> agent -> client -> endpoint
+                |                            |
+                |                      tools -> gameLookup (read-only)
+                |                            `-> requested memory notes
+                `-> chatSession <-> sessionManager (local persistence)
+
+proactive -> client (no tools); title/compaction -> client (no state or tools)
+uiBridge -> modAPI.injectUI() -> persistent overlay
 ```
 
 The mod follows a strict **modAPI-first** policy for AFNM `0.7.x`:
@@ -222,7 +243,7 @@ The mod follows a strict **modAPI-first** policy for AFNM `0.7.x`:
 1. Bump version in `package.json` (single source of truth).
 2. Run `bun run release:validate` to confirm tests, build, runtime oracle, and docs all pass.
 3. Upload to Steam Workshop: `bun run workshop:upload -- --change-note "vX.Y.Z - ..."`.
-   For 0.10.0, also pass `--sync-workshop-page` to publish the refreshed description after review.
+   For 0.11.0, also pass `--sync-workshop-page` to publish the refreshed description after review.
 4. Commit and push to `main`.
 5. Tag with `vX.Y.Z` and push the tag — GitHub Actions builds and creates the release automatically.
 
@@ -250,6 +271,9 @@ Authoritative project docs live in `docs/project/`:
 - The mod auto-detects model context/output limits from Anthropic, LM Studio, and Ollama APIs, with a static fallback table for other providers.
 - Proactive hints are optional and can be disabled in Settings.
 - The mod is read-only — it never mutates game state, Redux store, or gameplay.
+- Lookups improve access to records, not the model's judgment. It can still
+  misunderstand data. Quest/location lookups and in-game translations were
+  checked only with mocks; no live in-game test was run for 0.11.0.
 
 ## Feedback
 

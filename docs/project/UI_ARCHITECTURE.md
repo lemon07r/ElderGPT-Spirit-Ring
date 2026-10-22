@@ -6,7 +6,7 @@ owner: eldergpt-maintainers
 last_verified: 2026-10-22
 source_of_truth: src/ui + src/ui/chatSession.ts + src/ui/sessionManager.ts + src/config/settings.ts + src/integration/uiBridge.tsx
 review_cycle_days: 30
-related_files: src/ui/index.tsx,src/ui/ElderGPTApp.tsx,src/ui/chatSession.ts,src/ui/sessionManager.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ui/components/SettingsPanel.tsx,src/ui/components/SpiritRingToggle.tsx,src/integration/uiBridge.tsx
+related_files: src/ui/index.tsx,src/ui/ElderGPTApp.tsx,src/ui/chatTurn.ts,src/ui/chatSession.ts,src/ui/sessionManager.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ui/components/ChatTranscript.tsx,src/ui/components/SettingsPanel.tsx,src/integration/uiBridge.tsx
 ---
 
 # UI Architecture
@@ -61,23 +61,66 @@ form controls. This is bundle evidence, not a live controller/UI smoke test.
   - Session name display for non-default sessions
   - Session history panel with switch/delete
   - New Chat button in header
-  - Dynamic knowledge injection and compaction trigger before each send
+  - Shared `chatTurn.ts` Send/Retry pipeline: knowledge, compaction, then agent loop
   - Markdown rendering for assistant messages
-  - Streaming response display with loading animation
+  - Streaming intermediate/final text, Stop control, and current lookup label
+
+- `ChatTranscript` / `ChatComposer`
+  Display stopped replies without calling them failures; only the trailing error
+  offers Retry. The compact, initially collapsed `Consulted the records (N)` row
+  expands to lookup labels, marking failed lookups. Capability notices appear
+  once per endpoint/model/app session and never enter model-visible history.
 
 - `SettingsPanel`
-  Settings editor with: API provider selector, notched timeout slider, persona buttons (Elder/Calculator/Custom), text/window size controls, streaming toggle, proactive hints toggle. New: context window and max output token settings with auto-detection display from `modelLimits.ts`.
+  Provider/URL/key/model, persona, text/window sizes, streaming, proactive hints,
+  auto-title, and context/output overrides with model-limit detection. Temperature
+  is optional (blank means provider default). The timeout hint distinguishes
+  streaming byte-idle time from non-streaming total request time. The records
+  toggle defaults on and warns that some local models lack tool support.
+
+- `MemoryNotesSection`
+  Add/edit/delete global standing preferences, showing validation errors for
+  blank notes, more than 500 characters, or the 30-note cap. Notes live in
+  settings, not any one chat; they survive New Chat and session switches.
 
 - `MarkdownText`
   Renders assistant messages with code blocks, inline code, bold, italic, lists, headers, horizontal rules, and markdown tables (pipe-delimited with separator rows).
 
 - `LoadingAnimation`
-  Animated yin-yang glyph with floating text and pulsing dots while waiting for AI response.
+  Animated yin-yang glyph while waiting; shows `Consulting the records: <label>`
+  during lookup steps, including when intermediate reply text is already visible.
 
 ## Session Management
 
 - `sessionManager.ts` -- Session CRUD with localStorage persistence. Sessions store `{ id, name, messages[], createdAt, updatedAt }`. Auto-naming from first user message. Max 20 sessions with oldest pruned.
 - `chatSession.ts` -- Integrates with `sessionManager` for persistence. Restores active session on load. Auto-saves after each message. `startNewChat()` saves current session and creates a fresh one. `switchToSession()` saves and loads.
+
+Assistant messages may persist optional `error`, `stopped`, `lookups:
+{ label, ok }[]`, and `notice` metadata. Old messages without these fields still
+load without migration. Intermediate and final text are concatenated into one
+assistant reply. Raw tool calls/results and attached game state never persist.
+
+`src/ai/messages.ts` is the single API builder: strips UI metadata and excludes
+errors, stopped/empty messages, and leading greetings before transport, title,
+or compaction requests. Latest reported advisor input usage and current lookup
+label are session-local, ephemeral store fields; title usage cannot overwrite
+the compaction input count.
+
+Send and Retry use the same cancellation-aware pipeline. Retry removes the
+failed reply and any intervening assistant turns back to the latest player
+message, without appending a duplicate player message. Stop aborts the current
+request/loop and keeps partial visible text marked stopped; an empty stopped
+placeholder is removed. Automatic retries/fallbacks remain in the transport,
+not duplicated in UI code. See [AI Client](AI_CLIENT.md) for exact limits.
+
+## Harness Evidence
+
+`bun run ui:harness:build` / `ui:harness:serve` provide simulated normal,
+failure/Retry, proactive, and lookup turns. `Simulate Lookup Turn` drives the
+real Send/agent pipeline against mock fetch and game data, producing search/get
+labels and a final reply. The 0.11.0 browser check confirmed collapsed/expanded
+lookup rows and preserved intermediate text; screenshot saved locally. This is
+not an in-game controller/navigation test.
 
 ## State Boundaries
 
