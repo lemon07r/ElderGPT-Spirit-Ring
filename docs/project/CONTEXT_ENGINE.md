@@ -3,7 +3,7 @@ title: Context Engine
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-07-27
+last_verified: 2026-10-22
 source_of_truth: src/integration/contextEngine.ts + src/integration/gameState.ts + src/ai/knowledge/
 review_cycle_days: 30
 related_files: src/integration/contextEngine.ts,src/integration/gameState.ts,src/ai/knowledge/index.ts,src/ai/knowledge/statFormulas.ts,src/ui/components/ChatPanel.tsx
@@ -32,11 +32,13 @@ The `GameContext` payload includes:
   `combatStats`, root stats, buffs, enchantment, rarity/realm, and
   `harmonyAugment.type`/`quality`.
 
-- **Combat** (when in combat): enemy names/count, player HP/maxHP, full `CombatStatsMap` (power, defense, dr, barrier, critchance, school boosts/resistances, etc.), spar state.
+- **Combat** (when in combat): enemy names/count, player HP/maxHP, selected nonzero `CombatStatsMap` fields (power, defense, dr, barrier, critchance, school boosts/resistances, etc.), spar state. Unified health values are used directly, without a cultivator-resistance conversion.
 
 - **Crafting** (when crafting): recipe and bars, selected harmony,
   harmony-specific state, complexity multiplier, native crafting auto-use
   slots, companion, recommendations, and full crafting stats.
+  The generic stat map preserves the four 0.7.17 cost reduction/penalty fields;
+  harmony identifiers include Captivating Cadence and Returning Cycle.
 
 - **Research**: current material queue, remaining/discovered recipes, progress,
   material-return state, and installed harmony glyphs.
@@ -57,13 +59,22 @@ The `GameContext` payload includes:
 
 - **Stances**: stance names with technique sequences and fill count vs max technique slots (realm-dependent via `getTechniqueSlots`).
 
-- **Quests**: active quest names with step progress.
+- **Quests**: translated active quest names with step progress and focused-quest marker.
 
 - **NPCs**: character names, approval, relationship tier, following state (only NPCs with non-zero approval or who are following).
 
 - **Guild**: selected guild name, rank, approval.
 
-- **Recent events**: last 5 `persistentEventLog` entries with date and text.
+- **Sect**: rank, carried vault-slip counts (identified by live vault definitions,
+  not guessed names), total accepted mission/pending service counts, and up to
+  five live accepted missions and five active/ready services. Missions come from
+  location building state intersected with live quests, services from `sect`;
+  none of these paths dispatches actions. Quests no longer active and collected
+  services are omitted; completed objectives awaiting turn-in can still appear.
+
+- **Recent events**: first 5 `persistentEventLog` entries (runtime's newest-first
+  order), with date and text resolved through `utils.t()` on every extraction.
+  Deferred and plural translation objects never enter the string payload.
 
 ## System Prompt Structure
 
@@ -96,6 +107,8 @@ The game state is formatted with status-aware section inclusion to avoid filling
 | Quests | No | No | Yes |
 | NPCs | No | No | Yes |
 | Reputation & Guild | Always | Always | Always |
+| Sect rank & carried slips | When available | When available | When available |
+| Sect missions & services | No | No | When available |
 | Recent events | Always | Always | Always |
 
 ## Dynamic Knowledge System
@@ -103,7 +116,7 @@ The game state is formatted with status-aware section inclusion to avoid filling
 Knowledge files live in `src/ai/knowledge/`:
 
 - `gameOverview.ts` -- always included. AFNM overview, core loop, key concepts.
-- `statFormulas.ts` -- game constants and stat scaling formulas from source code. Included alongside the primary status-driven block (combat formulas with combat, crafting formulas with crafting).
+- `statFormulas.ts` -- verified stat names and calculation boundaries, not a formula calculator. Included alongside the primary status-driven block.
 - `combatKnowledge.ts` -- primary when `status === 'InCombat'`. Schools, damage types, tactical principles.
 - `craftingKnowledge.ts` -- primary when `status === 'Crafting'`. Techniques, harmony minigames, synergies.
 - `cultivationKnowledge.ts` -- primary when idle/event. Realms, progression, strategy.
@@ -114,7 +127,7 @@ The `selectKnowledge()` function uses a budget-based `tryAdd()` approach: primar
 
 - Keep the payload compact; tiered formatting avoids dumping irrelevant sections.
 - Use human-readable formatted context, not raw JSON dumps.
-- Keep all game-shape assumptions in `contextEngine.ts`.
-- Equipment stats are resolved via `modAPI.gameData.items` lookup at extraction time.
+- Keep all game-shape assumptions in `src/integration/` adapters.
+- Equipment stats use `utils.getFullItem()` with `modAPI.gameData.items` as fallback.
 - Token budgets prevent knowledge injection from crowding out conversation history.
 - System prompt is assembled in one place with no duplicated instructions across blocks.

@@ -3,7 +3,7 @@ title: Mod Architecture
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-07-27
+last_verified: 2026-10-22
 source_of_truth: src/integration, src/ui, src/ai, src/config, installed AFNM runtime
 review_cycle_days: 30
 related_files: src/integration/index.ts,src/integration/gameState.ts,src/integration/contextEngine.ts,src/integration/proactive.ts,src/ui/chatSession.ts,src/ui/sessionManager.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ai/client.ts,src/ai/knowledge/index.ts,src/ai/compaction.ts,src/ai/modelLimits.ts
@@ -23,10 +23,12 @@ The current architecture has seven parts:
 2. `src/integration/contextEngine.ts` and domain adapters
    These normalize the raw snapshot into `GameContext`. Equipment is resolved
    through `utils.getFullItem()` so enchantments and harmony augments are
-   reflected; dedicated adapters normalize equipment and the 0.7.6 soul-shard
+   reflected; dedicated adapters normalize equipment and the current soul-shard
    run/progression shape. Crafting context includes the selected harmony,
    harmony state, complexity, and native crafting auto-use slots. Research queue
    return/glyph state and Core Formation altar aggregates are also exposed.
+   `sectContext.ts` reads rank/services, carried vault slips, and accepted
+   missions; quest focus and deferred history translations follow 0.7.17 state.
 
 3. `src/ai/knowledge/`
    Dynamic game knowledge system. Maintains compiled knowledge blocks for crafting, combat, cultivation, and stat formulas that are injected into prompts based on current game state. The selector uses budget-based `tryAdd()` to prioritize status-relevant knowledge first, then complementary blocks if budget allows.
@@ -57,14 +59,14 @@ Reverse-engineering should be centralized and justified. Do not reintroduce ad h
 
 ## Current Adoption
 
-The repo currently adopts the new API in four places:
+The repo currently adopts the official API as follows:
 
 - Context extraction now runs from the official live snapshot first and supplements active combat reads from the read-only parts of `modAPI.combat` when available.
 - The chat header reacts to live state through the official subscription path.
 - A `combat-victory` inline CTA is injected through `injectUI()` to open the chat from a real game dialog.
 - Proactive suggestions now use official lifecycle hooks for location entry, month rollover, long day advances, combat completion, crafting completion, loot drops, and pre-combat advice.
 - Context extraction now includes `persistentEventLog` entries, `craftingTeamUpOverride` companion name, full equipment stats via item database lookup, player physical/social/affinity stats, combat entity stats, inventory, techniques, stances, quests, NPC relationships, and guild status.
-- The overlay root div uses native capture-phase event listeners to isolate all input events from game panels, preventing click/focus interception when game UI (inventory, etc.) is open behind ElderGPT.
+- The overlay root div uses native bubble-phase event listeners (`capture: false`) to stop input propagation beyond the mod root after its controls handle events. It does not install game-wide capture hooks.
 
 ## Deliberate Non-Adoption
 

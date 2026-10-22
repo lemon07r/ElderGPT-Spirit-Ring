@@ -3,7 +3,7 @@ title: Live Game Testing
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-07-06
+last_verified: 2026-10-22
 source_of_truth: scripts/installed-game-runtime.js + installed AFNM runtime
 review_cycle_days: 21
 related_files: scripts/installed-game-runtime.js,package.json,scripts/ui/agent-browser-harness.tsx,docs/project/RELEASE_PROCESS.md
@@ -28,11 +28,24 @@ bun run runtime:grep -- "injectUI|getGameStateSnapshot|onReduxAction"
 What this gives us:
 
 - the exact installed AFNM version
-- a cached extracted runtime under `tmp/installed-game-runtime/<fingerprint>/`
+- cached inspection sources under `$HOME/.local/tmp/afnm/eldergpt/runtime/<fingerprint>/`
 - a grep-able view of the real game bundle
 - a way to verify modAPI changes without UI launch risk
 
 For agent work, this is the preferred verification path for API surface, hook names, launcher behavior, and docs accuracy.
+
+The extractor reads only package metadata and renderer/main source files using
+positional ASAR reads. It does not download an extractor or unpack media/native
+dependencies. This avoids full-extraction overflow on the 2.9 GB 0.7.17 archive.
+`runtime:grep` prints matching excerpts with source line numbers so minified
+lines do not flood the terminal; include `.{0,100}` around a token for context.
+Set `AFNM_GAME_DIR` to inspect another installation.
+
+For 0.10.0, static inspection verified AFNM `0.7.17-d8ae6ce`, the combat-result
+dialog/selector, snapshot/subscription APIs, lifecycle hooks, sect and quest
+state, new harmonies/cost stats, and renderer globals. See
+[RELEASE_NOTES_0.10.0.md](./RELEASE_NOTES_0.10.0.md) for exact bundle locations.
+No live game or external LLM request was launched for this compatibility pass.
 
 ## Fast UI Smoke Tests Without The Game Runtime
 
@@ -57,7 +70,7 @@ The installed runtime currently reports:
 - `supportsDisableSteamSentinel: true`
 - `hasNativeLauncher: true`
 - `hasHostLauncher: true`
-- `disableSteamSentinelPath: /home/lamim/.local/share/Steam/steamapps/common/Ascend From Nine Mountains/disable_steam`
+- `disableSteamSentinelPath`: `<game directory>/disable_steam` (use the oracle's exact path)
   - **CRITICAL:** When finished testing, delete the `disable_steam` file so the game can communicate with Steam again. If left behind, workshop mods will not load.
 
 Recommended manual flow on Linux:

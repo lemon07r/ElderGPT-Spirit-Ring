@@ -39,6 +39,9 @@ ElderGPT Spirit Ring is a read-only advisor. Runtime integration observes the ga
   `modAPI.actions.getCoreFormationAltarStats()` when available.
 - Preserve the research queue's `materialReturned` state.
 - Keep system prompt rules consolidated; avoid duplicated instruction blocks.
+- AFNM 0.7.17 event history text/name overrides are `Translatable`; resolve display text through `utils.t()` on each extraction, never send objects as strings.
+- Sect rank/services are on `snapshot.sect`; accepted missions are on location building state plus quests, and vault slips are inventory items identified by vault definitions. Keep these lists compact and read-only.
+- Crafting stats use `qiCostReduction`, `qiCostPenalty`, `stabilityCostReduction`, and `stabilityCostPenalty`, not the removed percentage-cost multipliers. There are nine built-in harmonies.
 
 ## Documentation And Skill Stewardship
 

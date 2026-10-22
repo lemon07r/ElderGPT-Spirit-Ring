@@ -29,7 +29,7 @@ function createSnapshot(overrides: Partial<RootState> = {}): RootState {
     },
     player: {
       player: {
-        imageIndex: 0,
+        imageId: 'player',
         realm: 'bodyForging',
         realmProgress: 'Early',
         qi: 55,
@@ -114,7 +114,7 @@ function createSnapshot(overrides: Partial<RootState> = {}): RootState {
       forename: 'Lan',
       surname: 'Shen',
       sex: 'male',
-      imageIndex: 0,
+      imageId: 'player',
       birthBackground: undefined,
       childBackground: undefined,
       teenBackground: undefined,
@@ -156,7 +156,7 @@ function createSnapshot(overrides: Partial<RootState> = {}): RootState {
       mineViewport: undefined,
     },
     version: {
-      version: '0.7.6',
+      version: '0.7.17',
     },
     selectedCharacter: {
       selectedCharacter: undefined,
@@ -199,6 +199,10 @@ function createSnapshot(overrides: Partial<RootState> = {}): RootState {
       messages: [],
     },
     guild: {},
+    sect: {
+      rank: 'outerDisciple', disciples: [], authoredMembers: [],
+      nextDiscipleSequence: 0, populationTarget: 0, populationEvents: [],
+    },
     stoneCutting: {
       uncutStones: [],
       participants: [],
@@ -493,5 +497,106 @@ describe('extractContext', () => {
     expect(prompt).toContain('Blessings: Focused Mind');
     expect(prompt).toContain('Curses: Brittle Core');
     expect(prompt).toContain('Pending rewards: 3');
+  });
+
+  it('resolves deferred event text on each snapshot instead of serializing objects', () => {
+    let language = 'English';
+    const t = jest.fn(() => `${language} event`);
+    (globalThis as typeof globalThis & { window: Window }).window = {
+      modAPI: { utils: { t } } as unknown as ModAPI,
+    } as Window;
+    try {
+      const snapshot = createSnapshot();
+      snapshot.gameEvent.persistentEventLog = [{
+        year: 2, month: 4, day: 18,
+        history: [{ text: { _translatable: true, key: 'Event' }, sfx: 'confirm' }],
+      }];
+      expect(extractContext(snapshot).recentEvents[0].texts).toEqual(['English event']);
+      language = 'French';
+      const prompt = getSystemPrompt('Calculator', '', extractContext(snapshot));
+      expect(prompt).toContain('French event');
+      expect(prompt).not.toContain('[object Object]');
+    } finally {
+      delete (globalThis as Partial<{ window: Window }>).window;
+    }
+  });
+
+  it('marks the focused quest in idle context', () => {
+    const snapshot = createSnapshot();
+    snapshot.quests = {
+      focusedQuest: 'Promotion',
+      quests: [{ name: 'Promotion', seenUpTo: 0, completed: [0], killTally: {}, raidsComplete: 0 }],
+    };
+    expect(getSystemPrompt('Calculator', '', extractContext(snapshot))).toContain('Promotion (1/1) [focused]');
+  });
+
+  it.each(['captivatingCadence', 'returningCycle'] as const)('preserves %s and split crafting costs', (harmonyType) => {
+    const snapshot = createSnapshot();
+    snapshot.crafting.recipe = { name: 'Test Craft', harmonyTypeOverride: harmonyType } as NonNullable<RootState['crafting']['recipe']>;
+    snapshot.crafting.player = {
+      stats: { qiCostReduction: 20, qiCostPenalty: 10, stabilityCostReduction: 30, stabilityCostPenalty: 5 },
+    } as RootState['crafting']['player'];
+    const context = extractContext(snapshot);
+    expect(context.crafting?.harmonyType).toBe(harmonyType);
+    const prompt = getSystemPrompt('Calculator', '', context);
+    expect(prompt).toContain('qiCostReduction=20, qiCostPenalty=10, stabilityCostReduction=30, stabilityCostPenalty=5');
+  });
+
+  it('includes compact read-only sect rank, slips, accepted missions, and pending services', () => {
+    const snapshot = createSnapshot();
+    snapshot.sect.rank = 'coreDisciple';
+    snapshot.sect.services = [
+      { id: '1', kind: 'materialRequest', itemName: 'Spirit Iron', requestedQuantity: 3, status: 'ready', cost: 10, requestedAt: { year: 2, month: 4, day: 1 } },
+      { id: '2', kind: 'reforge', item: { name: 'Robes' }, materialCosts: [], status: 'collected', cost: 10, requestedAt: { year: 2, month: 4, day: 1 } },
+    ];
+    snapshot.inventory.items = [
+      ...Array.from({ length: 50 }, (_, i) => ({ name: `Item ${i}`, stacks: 1 })),
+      { name: 'Treasure Slip (I)', stacks: 3 }, { name: 'Treasure Slip (I)', stacks: 2 },
+    ];
+    snapshot.location.locations = {
+      'Third Mountain': {
+        buildingState: { mission: { kind: 'mission', accepted: [{ realm: 'bodyForging', rarity: 'mundane', quest: 'Patrol', condition: '1' }], missions: [] } },
+        currentMapEventName: undefined, currentMapEventDuration: 0, mapEventCooldown: {},
+      },
+    };
+    snapshot.quests.quests = [{ name: 'Patrol', seenUpTo: 0, completed: [0], killTally: {}, raidsComplete: 0, deadlineMonth: 30 }];
+    (globalThis as typeof globalThis & { window: Window }).window = {
+      modAPI: { gameData: {
+        locations: { 'Third Mountain': { buildings: [{ kind: 'vault', slips: { bodyForging: { name: 'Treasure Slip (I)' } } }] } },
+      } } as unknown as ModAPI,
+    } as Window;
+    try {
+      const before = JSON.stringify(snapshot);
+      const context = extractContext(snapshot);
+      expect(context.sect).toEqual({
+        rank: 'coreDisciple', vaultSlips: [{ name: 'Treasure Slip (I)', stacks: 5 }],
+        missionCount: 1, missions: [{ name: 'Patrol', completedSteps: 1, deadlineMonth: 30 }],
+        serviceCount: 1, services: [{ kind: 'materialRequest', status: 'ready', target: 'Spirit Iron' }],
+      });
+      const prompt = getSystemPrompt('Calculator', '', context);
+      expect(prompt).toContain('=== SECT === rank=coreDisciple');
+      expect(prompt).toContain('Vault slips: Treasure Slip (I) x5');
+      expect(prompt).toContain('Mission: Patrol, steps completed=1, deadline absolute month=30');
+      expect(prompt).toContain('Service: materialRequest Spirit Iron (ready)');
+      expect(prompt).not.toContain('Service: reforge');
+      expect(JSON.stringify(snapshot)).toBe(before);
+    } finally {
+      delete (globalThis as Partial<{ window: Window }>).window;
+    }
+  });
+
+  it('bounds sect lists, omits inactive missions, and supports absent sect state', () => {
+    const snapshot = createSnapshot();
+    snapshot.sect.services = Array.from({ length: 8 }, (_, i) => ({
+      id: String(i), kind: 'commissionCrafting' as const, recipeName: `Recipe ${i}`,
+      attempts: 1, ingredientCosts: [], status: 'active' as const, cost: 10,
+      requestedAt: { year: 2, month: 4, day: 1 },
+    }));
+    const sect = extractContext(snapshot).sect;
+    expect(sect?.serviceCount).toBe(8);
+    expect(sect?.services).toHaveLength(5);
+    expect(sect?.missions).toEqual([]);
+    expect(extractContext({ ...snapshot, sect: undefined } as unknown as RootState).sect).toBeNull();
+    expect(extractContext(null).sect).toBeNull();
   });
 });

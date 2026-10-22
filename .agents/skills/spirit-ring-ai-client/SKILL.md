@@ -29,7 +29,7 @@ The AI layer sends user-supplied game context and chat history to a configured e
 
 ## Compaction Rules
 
-- Trigger around 75% context usage or over 40 messages, with a minimum message count.
+- Trigger at 75% context usage or at least 40 messages, with a minimum of 10 messages.
 - Keep the last 6 messages verbatim.
 - Merge into any prior summary instead of starting over.
 - Insert the summary as a system message rendered as a chat divider.

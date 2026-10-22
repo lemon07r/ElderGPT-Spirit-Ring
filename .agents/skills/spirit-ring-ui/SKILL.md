@@ -17,8 +17,8 @@ The main UI is a persistent body-mounted React/MUI overlay plus targeted `inject
 
 - Keep the persistent root mounted to `document.body` until a deliberate architecture change replaces it.
 - Use the installed runtime's `window.React` and `window.ReactDOM.createRoot()` surface where bootstrap code expects it.
-- Preserve native capture-phase event isolation for mouse, pointer, keyboard, input, focus, and wheel events.
-- Use `injectUI()` for targeted affordances like the `combat-victory` Consult Spirit Ring button, not as a full overlay replacement yet.
+- Preserve native mod-root event isolation for mouse, pointer, keyboard, input, focus, and wheel events. `src/ui/index.tsx` uses bubble-phase listeners (`capture: false`), not capture-phase listeners.
+- Use `injectUI()` for targeted affordances like the `combat-victory` Consult Spirit Ring button (`[aria-live="assertive"]`, placement `after`), not as a full overlay replacement yet. Both target and dialog remain in AFNM 0.7.17; no main-menu selector is used.
 
 ## State Boundaries
 
@@ -38,7 +38,7 @@ Use the harness for open/close behavior, unread badges, session switching, setti
 
 ## Gotchas
 
-1. **Game panels can steal events**: preserve capture-phase event stopping on the overlay root.
+1. **Game panels can steal events**: preserve native event stopping on the mod's overlay root without blocking its own control handlers.
 2. **ReactDOM import paths can differ**: keep bootstrap aligned with installed runtime globals.
 3. **Session pruning is intentional**: max 20 sessions; don't remove without UX/storage rationale.
 4. **Injected button opens the same overlay**: avoid duplicate chat roots.

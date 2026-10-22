@@ -1,6 +1,6 @@
 # Historical ModAPI Endpoint Requests for Contextual AI Assistants
 
-This historical note predates the current AFNM `0.7.6` modAPI. Several requests below are now effectively covered by official APIs such as `getGameStateSnapshot()`, `subscribe()`, `injectUI()`, `onLocationEnter()`, `onAdvanceDay()`, `onAdvanceMonth()`, `onEventDropItem()`, and the existing completion hooks. Keep this file as historical context, not as the current implementation target.
+This historical note predates the current AFNM `0.7.17` modAPI. Several requests below are now effectively covered by official APIs such as `getGameStateSnapshot()`, `subscribe()`, `injectUI()`, `onLocationEnter()`, `onAdvanceDay()`, `onAdvanceMonth()`, `onEventDropItem()`, and the existing completion hooks. Keep this file as historical context, not as the current implementation target.
 
 To support advanced AI contextual assistants like ElderGPT, we require specific read-only access and event streams from the game engine. Our goal is to provide intelligent, contextual guidance to the player without resorting to brittle, unsafe workarounds like scraping React Fiber nodes or reading directly from the raw Redux store.
 

@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const childProcess = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
-const DEFAULT_GAME_DIR =
-  '/home/lamim/.local/share/Steam/steamapps/common/Ascend From Nine Mountains';
+const DEFAULT_GAME_DIR = path.join(
+  os.homedir(), '.steam', 'steam', 'steamapps', 'common', 'Ascend From Nine Mountains',
+);
 
 function fail(message) {
   console.error(message);
@@ -32,11 +34,11 @@ function getCacheFingerprint(asarPath) {
 }
 
 function getExtractDir(fingerprint) {
-  return path.join(ROOT, 'tmp', 'installed-game-runtime', fingerprint);
+  return path.join(os.homedir(), '.local', 'tmp', 'afnm', 'eldergpt', 'runtime', fingerprint);
 }
 
 function extractRuntime(asarPath, extractDir) {
-  const marker = path.join(extractDir, 'dist-electron', 'main', 'index.js');
+  const marker = path.join(extractDir, '.complete');
   if (fs.existsSync(marker)) {
     return extractDir;
   }
@@ -44,17 +46,52 @@ function extractRuntime(asarPath, extractDir) {
   fs.rmSync(extractDir, { recursive: true, force: true });
   fs.mkdirSync(extractDir, { recursive: true });
 
-  const result = childProcess.spawnSync(
-    'npx',
-    ['-y', '@electron/asar', 'extract', asarPath, extractDir],
-    {
-      stdio: 'inherit',
-      cwd: ROOT,
-    },
-  );
-
-  if (result.status !== 0) {
-    fail(`Failed to extract installed game runtime from ${asarPath}`);
+  // Read only inspection sources, not gigabytes of media/native dependencies.
+  // Positional reads avoid extractAll's signed 32-bit overflow on large ASARs.
+  const fd = fs.openSync(asarPath, 'r');
+  try {
+    const readAt = (size, position) => {
+      const buffer = Buffer.alloc(size);
+      let read = 0;
+      while (read < size) {
+        const count = fs.readSync(fd, buffer, read, size - read, position + read);
+        if (!count) throw new Error('Unexpected end of ASAR');
+        read += count;
+      }
+      return buffer;
+    };
+    const prefix = readAt(16, 0);
+    const dataOffset = 8 + prefix.readUInt32LE(4);
+    const header = JSON.parse(readAt(prefix.readUInt32LE(12), 16).toString('utf8'));
+    const visit = (files, parent = '') => {
+      for (const [name, entry] of Object.entries(files)) {
+        if (name === '.' || name === '..' || /[/\\]/.test(name)) {
+          throw new Error(`Unsafe ASAR entry: ${name}`);
+        }
+        const relative = parent ? `${parent}/${name}` : name;
+        if (entry.files) {
+          if (relative === 'dist-electron' || relative.startsWith('dist-electron/')) {
+            visit(entry.files, relative);
+          }
+        } else if (relative === 'package.json' ||
+          (relative.startsWith('dist-electron/') && /\.(?:js|cjs|mjs|json|html|ts)$/.test(name))) {
+          const destination = path.join(extractDir, relative);
+          fs.mkdirSync(path.dirname(destination), { recursive: true });
+          if (entry.unpacked) {
+            fs.copyFileSync(path.join(`${asarPath}.unpacked`, relative), destination);
+          } else {
+            fs.writeFileSync(destination, readAt(entry.size, dataOffset + Number(entry.offset)));
+          }
+        }
+      }
+    };
+    visit(header.files);
+    fs.writeFileSync(marker, 'inspection sources extracted\n');
+  } catch (error) {
+    fs.rmSync(extractDir, { recursive: true, force: true });
+    fail(`Failed to extract installed game runtime from ${asarPath}: ${error.message}`);
+  } finally {
+    fs.closeSync(fd);
   }
 
   return extractDir;
@@ -77,6 +114,7 @@ function extractSummary(extractDir, gameDir, asarPath) {
   const packageJsonPath = path.join(extractDir, 'package.json');
   const mainIndexPath = path.join(extractDir, 'dist-electron', 'main', 'index.js');
   const gameJsPath = path.join(extractDir, 'dist-electron', 'Game.js');
+  const rendererIndexPath = path.join(extractDir, 'dist-electron', 'index.js');
   const dynamicImportHelperPath = path.join(
     extractDir,
     'dist-electron',
@@ -86,17 +124,15 @@ function extractSummary(extractDir, gameDir, asarPath) {
   const packageJson = readJson(packageJsonPath);
   const mainIndex = readText(mainIndexPath);
   const gameJs = readText(gameJsPath);
-  const rendererJs = fs.existsSync(dynamicImportHelperPath)
-    ? `${gameJs}\n${readText(dynamicImportHelperPath)}`
-    : gameJs;
+  const rendererJs = [gameJs, ...[rendererIndexPath, dynamicImportHelperPath]
+    .filter((file) => fs.existsSync(file)).map(readText)].join('\n');
 
-  const buildVersion = mainIndex.match(/const ce="([^"]+)"/)?.[1] ?? null;
+  const buildVersion = mainIndex.match(/(?:const|var|let) \w+=[`"'](\d+\.\d+\.\d+-[a-f\d]+)[`"']/)?.[1] ?? null;
   const forgeLowPenalty =
     gameJs.includes('forgeWorks.heat>=2&&t.forgeWorks.heat<=3') ||
     gameJs.includes('forgeWorks.heat>=2&&e.forgeWorks.heat<=3');
   const forgeRecommendFusionThrough4 =
-    gameJs.includes('forgeWorks.heat<=4?t.recommendedTechniqueTypes=["fusion"]') ||
-    gameJs.includes('forgeWorks.heat<=4?e.recommendedTechniqueTypes=["fusion"]');
+    /recommendedTechniqueTypes=\w+\.forgeWorks\.heat<=4\?\[[`"']fusion[`"']\]/.test(gameJs);
 
   return {
     gameDir,
@@ -105,7 +141,7 @@ function extractSummary(extractDir, gameDir, asarPath) {
     gameVersion: packageJson.version ?? null,
     buildVersion,
     runtimeBehavior: {
-      writesRelativeSettingsJson: mainIndex.includes('k="./settings.json"'),
+      writesRelativeSettingsJson: /=[`"']\.\/settings\.json[`"']/.test(mainIndex),
       supportsDisableSteamSentinel: mainIndex.includes('disable_steam'),
       restartsThroughSteamByDefault: mainIndex.includes(
         'Restarting app through Steam...',
@@ -155,10 +191,24 @@ function extractSummary(extractDir, gameDir, asarPath) {
         rendererJs.includes('interceptBuffEffects') &&
         rendererJs.includes('statFilter'),
       hasGlobalBuffRegistry:
-        /techniques:[^,]{1,100},buffs:[^,]{1,100},techniqueBuffs:/.test(gameJs),
+        /buffs:[^,]{1,100},techniqueBuffs:/.test(gameJs),
       hasCoreFormationAltarStats: gameJs.includes(
         'getCoreFormationAltarStats',
       ),
+      hasSectState: gameJs.includes('populationTarget:') && gameJs.includes('authoredMembers:'),
+      hasFocusedQuest: gameJs.includes('focusedQuest'),
+      hasTournamentConfigs: gameJs.includes('tournamentConfigs:'),
+      hasCaptivatingCadence: gameJs.includes('name:`Captivating Cadence`'),
+      hasReturningCycle: gameJs.includes('name:`Returning Cycle`'),
+      hasSplitCraftingCosts: ['qiCostReduction', 'qiCostPenalty', 'stabilityCostReduction', 'stabilityCostPenalty']
+        .every((stat) => gameJs.includes(`${stat}:0`)),
+    },
+    ui: {
+      hasCombatVictoryDialog: gameJs.includes('id:`combat-victory`'),
+      hasCombatVictoryAssertiveTarget:
+        /id:`combat-victory`[\s\S]{0,400}"aria-live":`assertive`/.test(gameJs),
+      hasReactGlobals: gameJs.includes('window.React=') && gameJs.includes('window.ReactDOM='),
+      hasCreateRoot: rendererJs.includes('createRoot'),
     },
   };
 }
@@ -201,7 +251,7 @@ function main() {
       }
       const result = childProcess.spawnSync(
         'rg',
-        ['-n', pattern, path.join(extractDir, 'dist-electron')],
+        ['-n', '-o', '--max-columns', '1200', pattern, path.join(extractDir, 'dist-electron')],
         {
           cwd: ROOT,
           stdio: 'inherit',
@@ -220,4 +270,6 @@ function main() {
   }
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { extractRuntime, extractSummary };

@@ -12,7 +12,7 @@
   <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3701616500">
     <img src="https://img.shields.io/badge/Steam_Workshop-Subscribe-1b2838?logo=steam&logoColor=white" alt="Steam Workshop" />
   </a>
-  <img src="https://img.shields.io/badge/AFNM-0.7.6-blue" alt="Game Version" />
+  <img src="https://img.shields.io/badge/AFNM-0.7.17-blue" alt="Game Version" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
 
@@ -22,17 +22,21 @@ Want advice without tabbing out to a browser? ElderGPT Spirit Ring reads your li
 
 It is **read-only by design**: it does not automate combat, spend resources, or make choices for you.
 
+**Release 0.10.0 targets AFNM 0.7.17.** See the
+[release notes](docs/project/RELEASE_NOTES_0.10.0.md) for compatibility checks and changes.
+
 ## Features
 
 - 💬 **Persistent chat with sessions** — conversations are saved automatically. Switch between chats, start new ones, or pick up where you left off.
-- 🧠 **Deep game knowledge** — the AI is fed relevant crafting, combat, and cultivation knowledge based on your current activity, distilled from comprehensive game mechanics documentation.
-- 🎯 **Live 0.7.6 context** — advice includes resolved harmony-augmented
+- 🧠 **Focused game knowledge** — compact, verified crafting, combat, and cultivation guidance follows your current activity, including nine harmonies, unified health, and the new crafting cost stats.
+- 🎯 **Live 0.7.17 context** — advice includes resolved harmony-augmented
   equipment, selected crafting harmony/state, crafting auto-use, research,
-  Core Formation altar rewards, and soul-shard delve progression.
+  Core Formation altar rewards, soul-shard delve progression, focused quests,
+  translated event history, and a compact sect rank/slips/missions/services summary.
 - 📊 **Smart context management** — automatically detects your model's context window and compacts long conversations so the AI never loses track.
 - ⚡ **Streaming responses** — see words as the AI responds, with markdown formatting and a loading animation.
 - 🔔 **Proactive hints** — optional post-event suggestions after combat victories, travel, crafting completions, and time skips.
-- 🏆 **Combat victory CTA** — a quick "Ask the Spirit Ring" button appears on the win screen via `modAPI.injectUI()`.
+- 🏆 **Combat result shortcut** — a "Consult Spirit Ring" button opens the same chat from the result dialog via `modAPI.injectUI()`.
 - 🎭 **Personas** — choose between the lore-flavored *Elder* voice, the analytical *Calculator*, or write your own *Custom* persona prompt.
 - 🔌 **Bring your own model** — any OpenAI-compatible endpoint works (hosted providers, local servers, Anthropic, etc.).
 - 🎨 **Customizable UI** — adjust text size, window size, and drag the panel anywhere. Position persists across sessions.
@@ -88,8 +92,9 @@ provider's current documentation instead of relying on a fixed recommendation.
 
 - API settings, the API key, UI preferences, and chat sessions are stored in
   the game's local browser storage.
-- Each request sends the conversation and a focused snapshot of relevant game
-  state to the endpoint you configured.
+- Each chat request sends the conversation and a focused snapshot of relevant
+  game state to your endpoint. Optional proactive hints also send automatic
+  requests with current game context when enabled.
 - The mod author does not operate an intermediary service. Use only an endpoint
   you trust and a key you can revoke.
 
@@ -217,6 +222,7 @@ The mod follows a strict **modAPI-first** policy for AFNM `0.7.x`:
 1. Bump version in `package.json` (single source of truth).
 2. Run `bun run release:validate` to confirm tests, build, runtime oracle, and docs all pass.
 3. Upload to Steam Workshop: `bun run workshop:upload -- --change-note "vX.Y.Z - ..."`.
+   For 0.10.0, also pass `--sync-workshop-page` to publish the refreshed description after review.
 4. Commit and push to `main`.
 5. Tag with `vX.Y.Z` and push the tag — GitHub Actions builds and creates the release automatically.
 

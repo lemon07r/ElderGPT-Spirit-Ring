@@ -3,7 +3,7 @@ title: UI Architecture
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-07-27
+last_verified: 2026-10-22
 source_of_truth: src/ui + src/ui/chatSession.ts + src/ui/sessionManager.ts + src/config/settings.ts + src/integration/uiBridge.tsx
 review_cycle_days: 30
 related_files: src/ui/index.tsx,src/ui/ElderGPTApp.tsx,src/ui/chatSession.ts,src/ui/sessionManager.ts,src/config/settings.ts,src/ui/components/ChatPanel.tsx,src/ui/components/SettingsPanel.tsx,src/ui/components/SpiritRingToggle.tsx,src/integration/uiBridge.tsx
@@ -20,7 +20,7 @@ This remains intentional for now:
 - The mod needs one affordance that survives location, crafting, and event transitions.
 - A body-mounted root is simpler than registering and maintaining `injectUI()` slots for every screen/dialog where the chat should remain reachable.
 - The overlay should prefer the installed runtime's `window.React` and `window.ReactDOM` surface directly.
-- The root div registers native capture-phase event listeners for mouse, pointer, keyboard, input, focus, and wheel events to prevent game panels from intercepting ElderGPT interactions.
+- The root div registers native bubble-phase event listeners (`capture: false`) for mouse, pointer, keyboard, input, focus, and wheel events to stop propagation beyond the mod root after its controls handle events.
 
 Installed-runtime note:
 
@@ -34,7 +34,16 @@ AFNM `0.7.x` supports `window.modAPI.injectUI()`, and the mod uses it for target
 Current usage:
 
 - `combat-victory`
-  An inline `Consult Spirit Ring` button is injected into the victory dialog and dispatches the same open event used by the persistent overlay.
+  An inline `Consult Spirit Ring` button is injected after the dialog's
+  `[aria-live="assertive"]` element and dispatches the persistent overlay's open
+  event. The installed 0.7.17 dialog uses this ID for both victory and defeat.
+
+Static inspection on 2026-10-22 found the dialog and target together in
+`dist-electron/Game.js:3244`, injection/snapshot/subscription and React globals
+in `Game.js:6588`, and `createRoot` in `dist-electron/index.js:10` (exported to
+the mod through `PWd = e(yt())`). There are no main-menu selectors or game
+Fiber hooks in ElderGPT; the other DOM checks address its own root and standard
+form controls. This is bundle evidence, not a live controller/UI smoke test.
 
 ## Component Roles
 

@@ -3,7 +3,7 @@ title: AI Client
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-07-06
+last_verified: 2026-10-22
 source_of_truth: src/ai/client.ts + src/ai/modelLimits.ts + src/ai/compaction.ts + src/ai/tokenEstimator.ts
 review_cycle_days: 30
 related_files: src/ai/client.ts,src/ai/modelLimits.ts,src/ai/compaction.ts,src/ai/tokenEstimator.ts,src/ui/components/ChatPanel.tsx,src/integration/contextEngine.ts,src/config/settings.ts
@@ -55,7 +55,7 @@ User settings overrides (`contextLimitTokens`, `outputLimitTokens`) always take 
 
 Anchored iterative summarization based on Factory Droid's approach:
 
-- **Trigger**: estimated token usage reaches 75% of context window, OR message count exceeds 40 (minimum 10 messages required).
+- **Trigger**: estimated token usage reaches 75% of context window, OR message count reaches 40 (minimum 10 messages required).
 - **Process**: keep last 6 messages verbatim, summarize everything before that into a structured summary with sections (Session Context, Key Advice Given, Player Decisions, Unresolved).
 - **Iterative**: if a prior summary exists, merge new messages into it rather than regenerating from scratch.
 - **Summary message**: inserted as a `system`-role message, rendered in the chat UI as a centered divider.

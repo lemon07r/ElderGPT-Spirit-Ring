@@ -2,6 +2,9 @@ import type {
   HarmonyData,
   ModAPI,
   RecipeHarmonyType,
+  SectRank,
+  SectServiceKind,
+  SectServiceStatus,
 } from 'afnm-types';
 import type { getGameStateSource } from './gameState';
 
@@ -97,6 +100,15 @@ export type CoreFormationAltarContext = CoreFormationAltarStats & {
   beatenAltars: string[];
 };
 
+export interface SectContext {
+  rank: SectRank;
+  vaultSlips: InventoryEntry[];
+  missionCount: number;
+  missions: Array<{ name: string; completedSteps: number; deadlineMonth: number | null }>;
+  serviceCount: number;
+  services: Array<{ kind: SectServiceKind; status: SectServiceStatus; target: string }>;
+}
+
 export interface GameContext {
   source: ReturnType<typeof getGameStateSource>;
   status: string;
@@ -125,7 +137,7 @@ export interface GameContext {
   techniques: string[];
   craftingActions: string[];
   stances: { name: string; techniques: string[] }[];
-  quests: { name: string; completedSteps: number; totalSteps: number }[];
+  quests: { name: string; completedSteps: number; totalSteps: number; focused: boolean }[];
   characters: {
     name: string;
     approval: number;
@@ -133,6 +145,7 @@ export interface GameContext {
     isFollowing: boolean;
   }[];
   guild: { name: string; rank: number; approval: number } | null;
+  sect: SectContext | null;
   calendar: { year: number | null; month: number | null; day: number | null };
   activeEvent: boolean;
   flagCount: number;

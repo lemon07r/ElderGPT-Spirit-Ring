@@ -1,5 +1,5 @@
 export const CRAFTING_KNOWLEDGE = `\
-=== CRAFTING SYSTEM (AFNM 0.7.6) ===
+=== CRAFTING SYSTEM (AFNM 0.7.17) ===
 
 Crafting is action-based. Techniques spend Qi Pool and/or Stability and change
 Completion, Perfection, condition, buffs, and harmony state. A craft resolves
@@ -16,9 +16,9 @@ OUTCOMES:
 PLAYER-SELECTED HARMONIES:
 On a sublime craft the player selects any unlocked harmony; harmony is not
 derived from item kind. The selected value is stored on recipeStats.harmonyType.
-The seven built-in harmonies are Forge Works, Alchemical Arts, Inscribed
+The nine built-in harmonies are Forge Works, Alchemical Arts, Inscribed
 Patterns, Spiritual Resonance, Formless Way, Enhancing Echo, and Eccentric
-Decree.
+Decree, plus Captivating Cadence and Returning Cycle.
 
 Each harmony has its own state machine and a complexity multiplier applied to
 the recipe's Completion and Perfection targets at craft start:
@@ -29,10 +29,15 @@ the recipe's Completion and Perfection targets at craft start:
 - Formless Way x1.5
 - Enhancing Echo x1.3
 - Eccentric Decree x1.0
+- Captivating Cadence x1.5
+- Returning Cycle x1.3
 
 Use the live "Selected harmony", "Harmony state", and complexity values before
 giving harmony-specific advice. Enhancing Echo can alter live action costs;
 Formless Way begins at and pins a nonzero harmony value.
+Captivating Cadence builds a chain by changing action types. Returning Cycle
+tracks spent Qi Pool to gain charges; stabilize actions consume those charges
+for Harmony and Returned Precision. Use their live state, not Forge Works rules.
 
 AUTO-USE:
 AFNM has a native crafting auto-use loadout, separate from the combat loadout.
@@ -50,6 +55,13 @@ CORE STATS:
 - Qi Pool is spent by actions.
 - Stability reaching the failure boundary can end the craft.
 - Toxicity limits usable crafting consumables.
+- Qi/Stability costs use separate qiCostReduction, qiCostPenalty,
+  stabilityCostReduction, and stabilityCostPenalty stats, all starting at zero.
+  Reduction lowers costs; penalty raises them. The old poolCostPercentage and
+  stabilityCostPercentage multipliers are obsolete. Flat Qi Pool cost and
+  harmony/buff effects can also affect final costs.
+- Completion, Perfection, Stability, and Qi boosts are distinct modifiers.
+- Some crafting techniques spend Qi Droplets. Do not assume only items do so.
 
 Only quote exact action costs, success chances, or projected gains when they are
 present in live state; harmony and buffs can change them dynamically.`;

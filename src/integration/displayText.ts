@@ -4,8 +4,7 @@ export function asDisplayString(
   value: Translatable | string | undefined,
   fallback = '',
 ): string {
-  if (typeof value === 'string' && value.trim()) return value;
-  if (value && typeof value === 'object') {
+  if (value) {
     try {
       const translate =
         typeof window !== 'undefined' ? window.modAPI?.utils?.t : undefined;
@@ -16,7 +15,11 @@ export function asDisplayString(
     } catch {
       // Fall through to the stable translation key or caller fallback.
     }
+    if (typeof value === 'string') return value.trim() ? value : fallback;
     if ('key' in value && typeof value.key === 'string') return value.key;
+    if ('_plural' in value) {
+      return value.variables?.[value.countVar] === 1 ? value.one : value.other;
+    }
   }
   return fallback;
 }

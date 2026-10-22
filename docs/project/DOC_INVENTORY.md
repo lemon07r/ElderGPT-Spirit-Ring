@@ -3,7 +3,7 @@ title: Documentation Inventory
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-07-06
+last_verified: 2026-10-22
 source_of_truth: repository markdown file inventory
 review_cycle_days: 30
 related_files: AGENTS.md,docs/reference/AFNM_MODDING.md,scripts/docs/generate-inventory.js
@@ -11,19 +11,19 @@ related_files: AGENTS.md,docs/reference/AFNM_MODDING.md,scripts/docs/generate-in
 
 # Documentation Inventory
 
-Generated on: 2026-04-27
+Generated on: 2026-10-22
 
 ## Summary
 
 | Category | Count |
 |---|---|
-| project | 9 |
+| project | 10 |
 | dev-request | 0 |
 | project-meta | 0 |
 | history | 0 |
 | reference | 1 |
-| root-or-other | 2 |
-| total | 12 |
+| root-or-other | 3 |
+| total | 14 |
 
 ## Authoritative Docs
 
@@ -35,6 +35,8 @@ Generated on: 2026-04-27
 | `docs/project/CONTEXT_ENGINE.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 | `docs/project/DOC_INVENTORY.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 | `docs/project/LIVE_GAME_TESTING.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
+| `docs/project/RELEASE_NOTES_0.10.0.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
+| `docs/project/RELEASE_NOTES_0.9.0.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 | `docs/project/RELEASE_PROCESS.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 | `docs/project/UI_ARCHITECTURE.md` | project | active | true | eldergpt-maintainers | keep-authoritative |
 
@@ -48,6 +50,7 @@ Generated on: 2026-04-27
 | Path | Status | Authoritative | Owner | Decision |
 |---|---|---|---|---|
 | `AGENTS.md` | - | - | - | keep-authoritative-root |
+| `README.md` | - | - | - | keep-authoritative-root |
 | `REQUESTED_ENDPOINTS.md` | - | - | - | review |
 
 ## Reference Corpus Summary

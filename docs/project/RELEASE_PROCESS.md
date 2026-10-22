@@ -3,8 +3,8 @@ title: Release Process
 status: active
 authoritative: true
 owner: eldergpt-maintainers
-last_verified: 2026-07-27
-source_of_truth: package.json,scripts/workshop-upload.ts,.github/workflows/release.yml,../ModUploader-AFNM/electron/main/cli.ts
+last_verified: 2026-10-22
+source_of_truth: package.json,scripts/workshop-upload.ts,.github/workflows/release.yml
 review_cycle_days: 30
 related_files: package.json,scripts/workshop-upload.ts,docs/project/LIVE_GAME_TESTING.md,.github/workflows/release.yml,AGENTS.md
 ---
@@ -13,7 +13,14 @@ related_files: package.json,scripts/workshop-upload.ts,docs/project/LIVE_GAME_TE
 
 Use this sequence when preparing a real release.
 
-## 1. Validate Code And Docs
+## 1. Set Release Targets
+
+Update `version`, `gameVersion`, and the exact `afnm-types` dependency in
+`package.json`, then run `bun install` to update the canonical `bun.lock`.
+Do not maintain an npm lockfile alongside it; CI uses Bun's frozen lockfile.
+The 0.10.0 targets are AFNM/afnm-types `0.7.17`.
+
+## 2. Validate Code And Docs
 
 Run:
 
@@ -24,7 +31,7 @@ bun run release:validate
 
 If the runtime oracle no longer reports the expected AFNM capabilities, stop and refresh the integration/docs before releasing.
 
-## 2. Run A Manual Game Smoke Test
+## 3. Run A Manual Game Smoke Test
 
 Follow [LIVE_GAME_TESTING.md](./LIVE_GAME_TESTING.md).
 
@@ -37,13 +44,10 @@ Minimum manual checks:
 - proactive suggestions can appear without breaking the unread badge/state flow
 - chat requests still round-trip to a configured endpoint
 
-## 3. Bump Version
-
-Update the version in `package.json`.
-
-This repo treats `package.json` as the single release version source of truth. The build step writes that same version into the packaged `dist/.../package.json`.
-
 ## 4. Build The Release Artifact
+
+`package.json` is the release version source. The build writes that version and
+the installed `afnm-types` game version into the packaged manifest.
 
 ```bash
 bun run build
@@ -91,6 +95,15 @@ If you intentionally want to sync the committed repo title/description back to t
 ```bash
 bun run workshop:upload -- --sync-workshop-page --change-note "vX.Y.Z - refresh Workshop page copy"
 ```
+
+The 0.10.0 description refresh is intentional: after reviewing the diff and
+completing any manual smoke test, the release owner should use:
+
+```bash
+bun run workshop:upload -- --sync-workshop-page --change-note "v0.10.0 - AFNM 0.7.17 compatibility, sect context, and refreshed guidance"
+```
+
+Preparing this release does not authorize an agent to upload, commit, push, or tag.
 
 After first publish, write the returned workshop item ID back into `scripts/workshop-upload.ts` so normal update releases can use the default wrapper path.
 

@@ -4,7 +4,6 @@ import type {
   Item,
   ItemDesc,
   Realm,
-  RecipeHarmonyType,
   RootState,
 } from 'afnm-types';
 import { getGameStateSource, readGameStateSnapshot } from './gameState';
@@ -20,6 +19,7 @@ import type {
 import { buildEquipmentPiece } from './equipmentContext';
 import { extractSoulShardDelve } from './delveContext';
 import { asDisplayString } from './displayText';
+import { extractSectContext } from './sectContext';
 
 export type { GameContext } from './contextTypes';
 
@@ -41,7 +41,7 @@ const DEFAULT_CONTEXT: GameContext = {
   },
   maxTechniqueSlots: null,
   equipment: [], inventory: [], techniques: [], craftingActions: [],
-  stances: [], quests: [], characters: [], guild: null,
+  stances: [], quests: [], characters: [], guild: null, sect: null,
   calendar: { year: null, month: null, day: null },
   activeEvent: false, flagCount: 0, combat: null, crafting: null,
   research: { queue: [], glyphs: [] },
@@ -187,7 +187,7 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
     snapshot.crafting.recipeStats?.harmonyType ??
     snapshot.crafting.recipe?.harmonyTypeOverride ??
     null;
-  const harmonyConfig = harmonyType
+  const harmonyConfig = harmonyType && typeof window !== 'undefined'
     ? window.modAPI?.gameData?.harmonyConfigs?.[harmonyType]
     : undefined;
   const crafting = snapshot.crafting.progressState || snapshot.crafting.recipe
@@ -218,7 +218,7 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
     .slice(0, 5)
     .map((entry) => ({
       year: entry.year, month: entry.month, day: entry.day,
-      texts: entry.history.map((h) => h.text),
+      texts: entry.history.map((h) => asDisplayString(h.text)).filter(Boolean),
     }));
 
   // Equipment
@@ -249,9 +249,10 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
     ? window.modAPI?.gameData?.quests ?? null
     : null;
   const quests = (snapshot.quests.quests ?? []).map((q) => ({
-    name: q.name,
+    name: asDisplayString(questDb?.[q.name]?.displayName, q.name),
     completedSteps: q.completed.length,
     totalSteps: questDb?.[q.name]?.steps?.length ?? q.completed.length,
+    focused: q.name === snapshot.quests.focusedQuest,
   }));
 
   // NPCs
@@ -300,6 +301,7 @@ export function extractContext(snapshot: RootState | null = readGameStateSnapsho
     },
     maxTechniqueSlots: getTechniqueSlots(p.realm),
     equipment, inventory, techniques, craftingActions, stances, quests, characters, guild,
+    sect: extractSectContext(snapshot, typeof window === 'undefined' ? undefined : window.modAPI?.gameData),
     calendar: { year: snapshot.calendar.year ?? null, month: snapshot.calendar.month ?? null, day: snapshot.calendar.day ?? null },
     activeEvent: Boolean(snapshot.gameEvent.gameEvent),
     flagCount: Object.keys(snapshot.gameData.flags ?? {}).length,
@@ -350,8 +352,8 @@ function buildSystemPrompt(persona: string, customPrompt: string, context: GameC
   parts.push(`\
 RULES:
 - Reference the player's live game state (shown below) in every answer.
-- You CAN see: equipped item stats, player stats, combat stats, inventory, techniques, stances (with slot counts), quests, NPCs.
-- You CANNOT see: stats of items not equipped/in inventory, enemy internals beyond what combat shows, hidden formulas beyond your knowledge base.
+- You CAN see: equipped item stats, player stats, combat stats, inventory names/counts, techniques, stances (with slot counts), quests, NPCs, and the sect summary when available.
+- You CANNOT see: unequipped item stats, enemy internals beyond what combat shows, hidden formulas beyond your knowledge base.
 - NEVER fabricate stats, formulas, or item data. If you lack data, say so IMMEDIATELY in your first sentence.
 - When calculating, state which values you used and where they came from.
 - Keep answers concise: 2-4 sentences for quick questions, a short paragraph for complex strategy.
@@ -514,7 +516,7 @@ function formatGameState(context: GameContext): string {
   // Quests: only when idle/event
   if ((context.status === 'Idle' || context.status === 'Event') && context.quests.length > 0) {
     lines.push('', '=== QUESTS ===');
-    for (const q of context.quests) lines.push(`${q.name} (${q.completedSteps}/${q.totalSteps})`);
+    for (const q of context.quests) lines.push(`${q.name} (${q.completedSteps}/${q.totalSteps})${q.focused ? ' [focused]' : ''}`);
   }
 
   // NPCs: only when idle/event
@@ -583,6 +585,23 @@ function formatGameState(context: GameContext): string {
   // Guild
   if (context.guild) {
     lines.push(`Guild: ${context.guild.name} rank=${context.guild.rank} approval=${context.guild.approval}`);
+  }
+
+  if (context.sect) {
+    const sect = context.sect;
+    lines.push('', `=== SECT === rank=${sect.rank}`);
+    if (sect.vaultSlips.length > 0) {
+      lines.push(`Vault slips: ${sect.vaultSlips.map((item) => `${item.name} x${item.stacks}`).join(', ')}`);
+    }
+    if (context.status === 'Idle' || context.status === 'Event') {
+      lines.push(`Accepted missions: ${sect.missionCount} | Pending services: ${sect.serviceCount} (showing up to 5 each)`);
+      for (const mission of sect.missions) {
+        lines.push(`Mission: ${mission.name}, steps completed=${mission.completedSteps}${mission.deadlineMonth === null ? '' : `, deadline absolute month=${mission.deadlineMonth}`}`);
+      }
+      for (const service of sect.services) {
+        lines.push(`Service: ${service.kind} ${service.target} (${service.status})`);
+      }
+    }
   }
 
   // Recent events: always (compact)
