@@ -56,13 +56,23 @@ ElderGPT Spirit Ring is a read-only advisor. Runtime integration observes the ga
 
 ## Lookup Verification Limits
 
-Source-only AFNM 0.7.17 probes loaded nine registries and completed eleven
-search/get pairs. Quest/location initializers did not complete outside the
-game; those paths, live translations/resolvers, and real shop/vault source
-listings remain mocked-only/unverified in-game. Item sources are partial static
-listings, not promises of current stock. Provider smoke tests exercise real wire
-format against synthetic data, not the live game. No live in-game test was run
-for 0.11.0; do not upgrade these claims based on mock success.
+`bun run runtime:lookup-check` boots the extracted real AFNM renderer/mod loader
+in isolated Chromium, not the game binary. On `0.7.17-d8ae6ce`, assertions cover
+2–4 sampled entries in all 17 populated categories, including quests/locations,
+English translation/tag readability, caps, timings, unchanged snapshots, and six
+exact static Sources comparisons. German checks cover 11 entries in three
+categories through the real translation module. `mystical_regions` is empty in
+the verified base game; mods populate it. Coverage is sampled, not exhaustive.
+
+`--player` opts into a build-pinned served-response hook calling the real New
+Game thunk/inventory reducer in the sandbox only; all player sections and context
+formatting pass on that constructed Redux character. It does not test playable
+UI/controller behavior. Do not use menu ModAPI gameplay actions to seed it:
+`hasSave: false` makes those actions no-ops. Reports/temp profiles stay under
+`$HOME/.local/tmp/eldergpt-runtime/`; no real save, native game/Steam process,
+installation write, or provider call is involved. See LIVE_GAME_TESTING.md.
+Item sources remain partial static listings, not promises of current stock.
+Historical provider smoke tests used synthetic game data, not these registries.
 
 ## Documentation And Skill Stewardship
 

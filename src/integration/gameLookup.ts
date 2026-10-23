@@ -18,7 +18,7 @@ export interface GameLookupDependencies {
   readSnapshot?: () => RootState | null;
 }
 
-const REGISTRY_KEYS = {
+export const REGISTRY_KEYS = {
   items: 'items', techniques: 'techniques', buffs: 'buffs', monsters: 'monsters',
   quests: 'quests', locations: 'locations', crafting_techniques: 'craftingTechniques',
   recipes: 'researchableMap', breakthroughs: 'breakthroughs', manuals: 'manuals',
@@ -74,7 +74,7 @@ function plainText(value: unknown, deps: GameLookupDependencies): string {
 
 interface Entry { category: GameDataCategory; key: string; name: string; value: Record<string, unknown>; group?: string }
 
-function entries(category: GameDataCategory, deps: GameLookupDependencies): Entry[] {
+export function listGameDataEntries(category: GameDataCategory, deps: GameLookupDependencies): Entry[] {
   const registry = deps.gameData?.[REGISTRY_KEYS[category]];
   if (!registry) return [];
   const result: Entry[] = [];
@@ -86,7 +86,8 @@ function entries(category: GameDataCategory, deps: GameLookupDependencies): Entr
     for (let i = 2; keys.has(uniqueKey); i++) uniqueKey = `${key}#${i}`;
     keys.add(uniqueKey);
     const fallback = typeof data.name === 'string' ? data.name : key;
-    result.push({ category, key: uniqueKey, name: plainText(data.displayName ?? data.name ?? fallback, deps), value: data, group });
+    const locationName = category === 'mines' ? data.locationName : category === 'soul_shard_delves' ? data.location : undefined;
+    result.push({ category, key: uniqueKey, name: plainText(data.displayName ?? data.name ?? locationName ?? fallback, deps), value: data, group });
   };
   const arrayKey = (value: unknown, index: number) => {
     const data = record(value);
@@ -127,7 +128,7 @@ function matchRank(text: string, query: string): number {
 
 export function searchGameData(query: string, category: GameDataCategory | undefined, deps: GameLookupDependencies): LookupResult {
   const normalized = query.trim().normalize('NFKC').toLowerCase();
-  const matches = (category ? [category] : GAME_DATA_CATEGORIES).flatMap((kind) => entries(kind, deps))
+  const matches = (category ? [category] : GAME_DATA_CATEGORIES).flatMap((kind) => listGameDataEntries(kind, deps))
     .map((entry) => ({ entry, rank: Math.min(matchRank(entry.key, normalized), matchRank(entry.name, normalized)) }))
     .filter((entry) => entry.rank !== Infinity)
     .sort((a, b) => a.rank - b.rank || GAME_DATA_CATEGORIES.indexOf(a.entry.category) - GAME_DATA_CATEGORIES.indexOf(b.entry.category) || compare(a.entry.key, b.entry.key));
@@ -214,7 +215,7 @@ export function renderGameData(value: unknown, deps: GameLookupDependencies, max
 function itemSources(itemName: string, deps: GameLookupDependencies): string {
   const sources = new Set<string>();
   const named = (value: unknown) => record(value)?.name === itemName;
-  for (const location of entries('locations', deps)) {
+  for (const location of listGameDataEntries('locations', deps)) {
     const buildings = location.value.buildings;
     if (!Array.isArray(buildings)) continue;
     for (const value of buildings) {
@@ -242,14 +243,14 @@ function itemSources(itemName: string, deps: GameLookupDependencies): string {
       }
     }
   }
-  for (const monster of entries('monsters', deps)) {
+  for (const monster of listGameDataEntries('monsters', deps)) {
     const drops = monster.value.drops;
     if (Array.isArray(drops)) for (const value of drops) {
       const drop = record(value);
       if (named(drop?.item)) sources.add(`${monster.name}: drop amount=${drop!.amount}, chance=${drop!.chance}${drop?.condition ? `; condition: ${plainText(drop.condition, deps)}` : ''}`);
     }
   }
-  for (const recipe of entries('recipes', deps)) {
+  for (const recipe of listGameDataEntries('recipes', deps)) {
     const outputs = ['baseItem', 'perfectItem', 'sublimeItem'].filter((key) => named(recipe.value[key]));
     if (outputs.length) sources.add(`${recipe.name} [${recipe.key}]: ${outputs.join('/')} output`);
   }
@@ -258,7 +259,7 @@ function itemSources(itemName: string, deps: GameLookupDependencies): string {
 }
 
 export function getGameEntry(category: GameDataCategory, key: string, deps: GameLookupDependencies): LookupResult {
-  const all = entries(category, deps);
+  const all = listGameDataEntries(category, deps);
   const query = key.trim().normalize('NFKC').toLowerCase();
   const exactKey = all.find((entry) => entry.key.normalize('NFKC').toLowerCase() === query);
   const matches = exactKey ? [exactKey] : all.filter((entry) => entry.name.normalize('NFKC').toLowerCase() === query);

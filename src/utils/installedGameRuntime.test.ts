@@ -15,7 +15,11 @@ test('runtime inspection extracts source files past 2 GiB without media or npx',
     const header = Buffer.from(JSON.stringify({ files: {
       'package.json': { size: Buffer.byteLength(source), offset: String(offset) },
       'movie.webm': { size: 4, offset: '0' },
-      'dist-electron': { files: { 'Game.js': { size: 4, offset: '0' } } },
+      'dist-electron': { files: {
+        'Game.js': { size: 4, offset: '0' },
+        'Game.css': { size: 3, offset: '4' },
+        'texture.webp': { size: 4, offset: '0' },
+      } },
     } }));
     const prefix = Buffer.alloc(16);
     prefix.writeUInt32LE(4, 0);
@@ -28,16 +32,22 @@ test('runtime inspection extracts source files past 2 GiB without media or npx',
       fs.writeSync(fd, prefix);
       fs.writeSync(fd, header);
       fs.writeSync(fd, Buffer.from('code'), 0, 4, dataOffset);
+      fs.writeSync(fd, Buffer.from('a{}'), 0, 3, dataOffset + 4);
       fs.writeSync(fd, Buffer.from(source), 0, Buffer.byteLength(source), dataOffset + offset);
     } finally {
       fs.closeSync(fd);
     }
     const output = path.join(directory, 'extracted');
+    fs.mkdirSync(output);
+    fs.writeFileSync(path.join(output, '.complete'), 'legacy sources-only cache');
     expect(extractRuntime(asar, output)).toBe(output);
     expect(fs.readFileSync(path.join(output, 'package.json'), 'utf8')).toBe(source);
     expect(fs.readFileSync(path.join(output, 'dist-electron', 'Game.js'), 'utf8')).toBe('code');
+    expect(fs.readFileSync(path.join(output, 'dist-electron', 'Game.css'), 'utf8')).toBe('a{}');
+    expect(fs.existsSync(path.join(output, 'dist-electron', 'texture.webp'))).toBe(false);
     expect(fs.existsSync(path.join(output, 'movie.webm'))).toBe(false);
-    expect(fs.existsSync(path.join(output, '.complete'))).toBe(true);
+    expect(fs.existsSync(path.join(output, '.complete'))).toBe(false);
+    expect(fs.existsSync(path.join(output, '.complete-renderer-v2'))).toBe(true);
     // A completed extraction is reusable, even without opening the archive again.
     fs.unlinkSync(asar);
     expect(extractRuntime(asar, output)).toBe(output);

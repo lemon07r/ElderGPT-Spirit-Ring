@@ -17,7 +17,7 @@ import {
 export const TOOL_DEFINITIONS = [
   {
     name: 'search_game_data',
-    description: 'Search authored game data by translated display name or key. Returns up to 20 ranked matches with exact keys; use get_game_entry for full details.',
+    description: 'Search authored game data by translated display name or key. Returns up to 20 ranked matches with exact keys; use get_game_entry for full details. mystical_regions is mod-populated and may be empty in the base game.',
     parameters: {
       type: 'object', properties: { query: { type: 'string' }, category: { type: 'string', enum: GAME_DATA_CATEGORIES } },
       required: ['query'],

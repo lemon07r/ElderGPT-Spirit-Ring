@@ -124,8 +124,8 @@ smoke did **not** trigger the 400 parameter fallbacks. Unit tests cover their
 rejection paths. No new wire-format bug was found; no D runtime fix/regression
 test was needed. Models can still add unsupported interpretations to records.
 
-Reusable local script: `$HOME/.local/tmp/eldergpt/protocol-smoke.ts`; requires
-`ELDER_KEY` from the environment, optional `SMOKE_CASES`/`ELDER_ENDPOINT`.
+The temporary protocol-smoke script was subsequently removed with its scratch
+directory. The results above are historical evidence, not a retained runner.
 
 After the hardening changes, reran only `claude-stream,gpt-stream` once each:
 four HTTP 200 requests, two successful lookups per case, tool-result round-trip,
@@ -156,18 +156,20 @@ intermediate/final text locally; no Steam or game launch was involved.
 
 ## Known Limits
 
-- Quest/location lookup paths and in-game translations/resolvers are verified
-  only with mocked data. Source-only real-data probing could not initialize
-  quest/location world dependencies. Nine other registries / eleven search/get
-  pairs were probed; real shop/vault source listings remain unverified.
+- At release time, source-only probing could not initialize quest/location world
+  dependencies. The subsequent [0.11.1 runtime verification](./RELEASE_NOTES_0.11.1.md)
+  boots the extracted real renderer/mod loader and supersedes that limitation:
+  sampled lookups in all 17 populated categories, English/German translations,
+  real resolvers, and six static Sources comparisons are now checked. It also
+  fixes raw-ID display names in mines/delves; coverage is not exhaustive.
 - Lookups require a tool-capable model. Providers may reject or silently ignore
   tools, omit usage/cache counters, or vary caching behavior. The smoke only
   covers the named models/routes through CLIProxy, not every direct provider.
 - Records do not expose arbitrary hidden formulas or evaluate authored dynamic
   functions. Static sources may omit conditions or current availability; advice
   can still be wrong. Notes and lookup details are sent to the chosen endpoint.
-- **No live in-game test for 0.11.0.** Provider wire tests and browser harness
-  evidence do not verify game UI/controller behavior or all live data paths.
+- **No native in-game test for 0.11.0.** The later isolated renderer checks do
+  not verify game UI/controller behavior or all live data paths.
 - No commit, push, tag, Workshop upload, or gameplay mutation is part of this
   release preparation; publishing remains the owner's step.
 

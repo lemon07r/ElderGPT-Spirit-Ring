@@ -38,7 +38,7 @@ function getExtractDir(fingerprint) {
 }
 
 function extractRuntime(asarPath, extractDir) {
-  const marker = path.join(extractDir, '.complete');
+  const marker = path.join(extractDir, '.complete-renderer-v2');
   if (fs.existsSync(marker)) {
     return extractDir;
   }
@@ -74,7 +74,7 @@ function extractRuntime(asarPath, extractDir) {
             visit(entry.files, relative);
           }
         } else if (relative === 'package.json' ||
-          (relative.startsWith('dist-electron/') && /\.(?:js|cjs|mjs|json|html|ts)$/.test(name))) {
+          (relative.startsWith('dist-electron/') && /\.(?:js|cjs|mjs|json|html|css|ts)$/.test(name))) {
           const destination = path.join(extractDir, relative);
           fs.mkdirSync(path.dirname(destination), { recursive: true });
           if (entry.unpacked) {

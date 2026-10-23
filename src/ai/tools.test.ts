@@ -84,6 +84,19 @@ describe('provider-neutral read-only tools', () => {
     expect(runTool('get_game_entry', { category: 'items', key: 'one' }, data).ok).toBe(true);
   });
 
+  test('real-shaped mines and delves search and render translated location names, not registry IDs', () => {
+    const data = deps({
+      mineConfigs: { yinying: { id: 'yinying', chartTitle: 'Yinying Mine Chart', locationName: 'Yinying Mine', chambers: {} } },
+      soulShardDelves: { bifangShard: { key: 'bifangShard', location: 'Domain of Cinders', rooms: [] } },
+    });
+    data.utils!.t = (value) => ({ 'Yinying Mine': 'Yinying-Mine', 'Domain of Cinders': 'Domäne der Glut' }[String(value)] ?? String(value));
+    for (const [category, key, name] of [['mines', 'yinying', 'Yinying-Mine'], ['soul_shard_delves', 'bifangShard', 'Domäne der Glut']]) {
+      expect(runTool('get_game_entry', { category, key }, data).text).toMatch(new RegExp(`^${name} \\(`));
+      expect(runTool('search_game_data', { category, query: name }, data).text).toContain(`${key} | ${name} |`);
+      expect(runTool('get_game_entry', { category, key: name }, data).ok).toBe(true);
+    }
+  });
+
   test('serializer translates, expands tags, preserves exact numbers and drops functions, React, cycles and presentation', () => {
     const callback = jest.fn(() => { throw new Error('Must never be called'); });
     const value: Record<string, unknown> = {
@@ -146,6 +159,26 @@ describe('provider-neutral read-only tools', () => {
     expect(result.text).toContain('Village: vault Pill Cache (bodyForging, cost 3)');
     expect(result.text).toContain('Rat: drop amount=2, chance=0.125');
     expect(result.text).toContain('Pill Recipe [pills/Pill Recipe]: baseItem/perfectItem output');
+  });
+
+  test('Sources retain trimmed renderer market/vault/drop/recipe records', () => {
+    const core = { name: "Xuanzang's Formation Core" };
+    const pill = { name: 'Ironflesh Pill' };
+    const data = deps({
+      items: { [core.name]: core, [pill.name]: pill, 'Acknowledgement of Blossom': { name: 'Acknowledgement of Blossom' }, herb: { name: 'Flaring Yang Bud' } },
+      locations: {
+        'Spirit Herb Garden': { name: 'Spirit Herb Garden', buildings: [{ kind: 'market', itemPool: { bodyForging: [{ name: 'Flaring Yang Bud', stacks: 10 }] }, costMultiplier: 1.5, refreshMonths: 1 }] },
+        'Third Mountain': { name: 'Third Mountain', buildings: [{ kind: 'vault', slips: { bodyForging: { name: 'Ruby Treasure Slip' } }, itemPool: { bodyForging: [{ id: "Xuanzang's Formation Set", displayName: "Xuanzang's Formation Set", cost: 3, rewards: [core, { name: 'Formation Blade' }, { name: 'Formation Bell' }] }] } }] },
+      },
+      monsters: [{ name: 'Blossom Ancestor', drops: [{ item: { name: 'Acknowledgement of Blossom' }, condition: 'equipped_Vow_of_Blossom == 1', chance: 1, amount: 1 }] }],
+      researchableMap: { 'Tempered Marrow Drop': [{ kind: 'recipe', name: 'Ironflesh Pill Recipe', baseItem: { name: 'Spirit Core (IV)' }, perfectItem: { name: 'Tempered Marrow Drop' }, sublimeItem: pill, ingredients: [{ item: { name: 'Tempered Marrow Drop' }, quantity: 1 }, { item: { name: 'Spirit Core (IV)' }, quantity: 1 }], forceSublimeCrafting: true }] },
+    });
+    const source = (key: string) => runTool('get_game_entry', { category: 'items', key }, data).text.split('\nSources ')[1];
+    expect(source(core.name)).toContain("Third Mountain: vault Xuanzang's Formation Set (bodyForging, cost 3)");
+    expect(source(core.name)).not.toContain('Recipe');
+    expect(source(pill.name)).toContain('Ironflesh Pill Recipe [Tempered Marrow Drop/Ironflesh Pill Recipe]: sublimeItem output');
+    expect(source('Acknowledgement of Blossom')).toContain('Blossom Ancestor: drop amount=1, chance=1; condition: equipped_Vow_of_Blossom == 1');
+    expect(source('herb')).toContain('Spirit Herb Garden: market (itemPool: bodyForging)');
   });
 
   test('inventory resolves all counts and full item stats without passing live descriptors to helpers', () => {
